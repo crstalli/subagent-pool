@@ -1,0 +1,5 @@
+node_modules/
+test/.server-pid
+test/e2e-*.png
+test/settings-body.txt
+test/console-errors.txt
