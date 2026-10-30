@@ -1,0 +1,3 @@
+- insert:
+    - id: subagent-pool-boot
+      name: '@local/subagent-pool-boot'

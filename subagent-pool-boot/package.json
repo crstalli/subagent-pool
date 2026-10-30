@@ -1,0 +1,23 @@
+{
+  "name": "@local/subagent-pool-boot",
+  "version": "1.0.0",
+  "description": "Subagent Pool: caps concurrent subagents per model, routes to the right model, queues at capacity, and exposes a Settings card in the Web GUI.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./dsh/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "dependencies": {}
+}
