@@ -1,0 +1,478 @@
+New Session
+Workspaces
+f
+ai
+cztl
+cztl
+1mo
+Llama.cpp SYCL VRAM allocation fix
+1mo
+Research and compile football fantasy knowledge
+9min
+Lets create a skill to
+28d
+Load and activate subagent-pool
+29d
+Show 16 more sessions
+Settings
+Settings
+General
+Models
+Plugins
+Agent presets
+Open configuration file
+Close
+Permission
+Choose the default permission mode for new sessions
+Full access
+Language
+English
+Appearance
+Light
+Dark
+System
+Font size
+Only affects conversation content
+14
+px
+Conversation display
+Controls process content in completed turns
+Normal
+Enter behavior while busy
+Busy only; Cmd/Ctrl+Enter uses the other behavior
+Queue
+Llama.cpp SYCL VRAM allocation fix
+Standard mode
+Session log
+Chat
+Trajectory
+System prompt
+Why is this not workign well with qwen 3.8 27b Q4 model?? I have 22.2 vram used out of 32gb on my arc b65. Running on llama.cpp. How can I stop it from using my ram and use vram? # ==============================================================================
+# 2. Optimized Intel oneAPI & MSVC Path Injection (Prevents Line Too Long Error)
+# ==============================================================================
+# Instead of parsing massive batch scripts dynamically at boot, add the target binaries directly:
+$TargetPaths = (
+    "C:\Program Files\Intel\oneAPI\compiler\latest\windows\bin",
+    "C:\Program Files\Intel\oneAPI\compiler\latest\windows\lib",
+    "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\bin\Hostx64\x64" # Adjust version if needed
+)
+
+foreach ($path in $TargetPaths) {
+    if (Test-Path $path) {
+        $env:PATH = "$path;" + $env:PATH
+    }
+}
+
+# ==============================================================================
+# 3. Intel SYCL & Level Zero Hardware Optimizations
+# ==============================================================================
+$env:ONEAPI_DEVICE_SELECTOR = "level_zero:0"
+$env:SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE = "1"
+$env:UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS = "1"
+$env:SYCL_CACHE_PERSISTENT = "1"
+$env:SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS = "1"
+$env:ZE_AFFINITY_MASK = "0"  # Ensures only your main Intel GPU is targeted
+$env:NEOReadDebugKeys = "1"
+$env:ZEX_NUMBER_OF_VMS = "1"
+# THE FIX: This forces the driver to allow 100% maximum allocation sizes
+$env:ZE_SHARED_FORCE_DEVICE_ALLOC = "1" 
+
+$envLLAMA_KV_KEEP_ONLY_ACTIVE="1"
+
+# Environment diagnostics & Python cleanup
+$env:SYCL_PI_TRACE = ""      
+$env:SYCL_UR_TRACE = "0"     
+$env:PYTHONPATH = ""         
+
+# ==============================================================================
+# 4. llama.cpp SYCL Runtime Config
+# ==============================================================================
+$env:LLAMA_SYCL_DEVICE       = "level_zero:0"
+$env:LLAMA_GPU_LAYERS        = "99"
+#$env:GGML_SYCL_STRICT_ALLOC  = "1"
+$env:GGML_SYCL_USM_SYSTEM = "0" 
+$env:GGML_SYCL_ENABLE_HOST_PINNED_MEM = "0"
+#        --cache-type-k q8_0 `
+#        --cache-type-v q8_0 `
+# ==============================================================================
+# 5. Execution Helper Functions
+# ==============================================================================
+function run-llama-3 {
+    .\llama-server.exe `
+        --device SYCL0 `
+        -m "F:\models\Qwen3.8-27B-Q4_K_M2.gguf" `
+        --mmproj "F:\models\mmproj-F16.gguf" `
+        --spec-draft-n-max 3 `
+        --spec-type draft-mtp `
+        -ngl 99 `
+        --ctx-size 196000  `
+        -fa 1 `
+        -b 2048 `
+        -ub 1024 `
+        --fit off `
+        --parallel 3 `
+        -t 4 `
+        --port 8001 `
+	--load-mode none `
+        --timeout 18000 `
+        --metrics `
+        --cache-type-k q4_0 `
+        --cache-type-v q4_0 `
+        --kv-unified `
+        --no-kv-offload `
+        -lv 4
+
+
+}
+9/20 20:06
+Context injection
+@deepseek-ai/dsh-system-prompt
+Context injection
+skill-catalog
+Think
+Let me analyze this problem. The user is running llama.cpp with the SYCL backend on an Intel Arc B65 (32 GB of VRAM), using a Qwen3.8-27B Q4 model. 22.2 GB of VRAM is used out of 32 GB, and it's spilling into system RAM. The question is: why is it falling back to RAM, and how can I make it use only VRAM?
+Search
+llama.cpp llama-server --load-mode flag, llama.cpp --no-kv-offload KV cache CPU RAM
+Get whatever info you need from here: https://qwen.ai/blog?id=qwen3.8
+9/20 20:21
+https://github.com/ggml-org/llama.cpp
+9/20 20:21
+the model is in /mnt/f/models. Its q4.
+9/20 20:21
+one more thing; my intel arc is not used for graphics. my 3080 is where my display is plugged into
+9/20 20:21
+so context of 196k, = 64/3 because paralell 3. It doesn't give 3 different huge contexts.
+9/20 20:21
+Think
+User's explanation: With `--parallel 3` and `--ctx-size 196000`, is the context 196k/3 ≈ 64k per slot? No — the user is claiming that 196k is the total, and each slot only gets 1/3 of it. This is **wrong** in llama.cpp: `--ctx-size` (n_ctx) is **per slot**, and `--parallel 3` creates 3 slots each with the full 196k context. The total KV memory = parallel × ctx-size. This is a very common misconception. I should politely but firmly correct it: in llama.cpp, n_ctx is per slot, and the total KV = n_parallel × n_ctx.
+Tool call
+read_page · https://qwen.ai/blog?id=qwen3.8
+Bash
+List model files directory
+Fetch
+https://raw.githubusercontent.com/ggml-org/llama.cpp/master/tools/server/README.md
+Think
+Alright. Next, I need the actual model's architecture from the GGUF file. Let's read the GGUF metadata of /mnt/f/models/Qwen3.8-27B-Q4_K_M2.gguf (16.8 GB). I can write a small Python parser for the GGUF header metadata. Let me check if Python is available and if the `gguf` package is installed. If not, I can parse manually — the GGUF format is simple:
+
+I'll pull the exact architecture from your GGUF and check how llama.cpp's --kv-unified actually sizes the KV pool — your "196k ÷ 3" theory depends on it.
+
+Bash
+Parse GGUF metadata for model architecture
+Bash
+Sparse-clone llama.cpp server source
+Think
+Excellent! Now I've got the exact architecture:
+
+I've obtained the architecture. Next, I'll retrieve the missing layer count and verify in the source code how --kv-unified + --parallel 3 + -c 196000 allocates memory.
+
+Failed
+Bash
+Print all GGUF metadata keys except tokenizer
+Failed
+Bash
+Find kv-unified-per-slot handling in server source
+Think
+There are two problems:
+
+/tmp doesn't persist between calls — I'll do the clone and grep in one shot, and fix the parser (my skip logic desynced on the tokenizer strings).
+
+Bash
+Print all non-tokenizer GGUF metadata keys
+Bash
+Clone llama.cpp and find unified KV pool sizing code
+Think
+Whoa — big discovery. This model is **not** a plain 27B dense transformer! Look at the metadata:
+
+The model's metadata has revealed a critical fact: this isn't a normal dense transformer — qwen35.ssm.* + full_attention_interval = 4 means it's a Qwen3-Next style hybrid (out of 65 blocks, only about 1/4 are full attention layers). This changes the KV calculation dramatically. Alright, let's settle the pool size question in the source:
+
+Bash
+Clone llama.cpp, sparse-checkout, grep kv_unified_per_slot
+System prompt
+Think
+In other words:
+Failed
+Bash
+Read pool sizing code and no_kv_offload handling
+Think
+Ugh — /tmp doesn't persist between bash calls. Need to do everything in a single call. Let me bundle clone + sed + grep all into one.
+
+/tmp gets wiped between calls — bundling into one command:
+
+Bash
+Clone and inspect pool sizing plus no_kv_offload code
+Retried model request (1/5) · 1s
+Think
+I've confirmed the pool sizing: `ctx_pool_auto_sized` only applies when `n_ctx == 0`. The user is pinning `-c 196000`, so the unified pool is exactly 196000 tokens total (shared across the 3 slots), not 3 × 196k. In other words, on pool size, the user's intuition was correct: 196k is the total shared pool.
+
+Pool size has been confirmed: -c 196000 fixes the total shared pool at 196k — it's not 3×196k. Next up is the KV placement code:
+
+Bash
+Find KV placement code and qwen35 hybrid attention layout
+Think
+Now I have everything I need. Let me confirm:
+
+I've confirmed both the key facts. Let me verify the full-attention layer count rule in the qwen35 model code so my KV math is exact:
+
+Bash
+Check full attention layer interval rule for qwen35
+Think
+Confirmed: `is_recr_impl[i] = ((i+1) % 4 != 0)` — in other words, the layers where (i+1) % 4 == 0 are FULL ATTENTION. For n_layer = 65: i+1 ∈ {4,8,12,...,64} → 16 full attention layers, 49 recurrent (linear/SSM) layers.
+
+Everything's confirmed now — including a surprise about your model that changes the whole picture.
+
+1. The exact switch: --no-kv-offload
+
+That flag is the only thing forcing your KV cache into system RAM. In the llama.cpp source (common/common.cpp):
+
+cpp
+Copy
+cparams.offload_kqv = !params.no_kv_offload;
+
+With it set, the entire unified KV pool lives in pinned host memory no matter how small it is. Delete that line and the KV moves to the Arc.
+
+2. Why you can afford to delete it: your model is a hybrid, and its KV is small
+
+I parsed your GGUF (Qwen3.8-27B-Q4_K_M2.gguf, arch qwen35) and the model code. It is not a dense 27B transformer — it's Qwen3-Next-style:
+
+65 blocks, full_attention_interval = 4 → only 16 full-attention layers; the other 49 are linear-attention (SSM/delta-net) layers whose state is fixed-size (~1.5 MiB/layer, independent of context length)
+Full-attn layers: 4 KV heads × 256 dim (GQA), native ctx 262k
+1 MTP layer (nextn_predict_layers = 1) — your --spec-type draft-mtp is the right match
+
+KV per token (q4_0 = 0.5625 B/elem): 16 layers × 4 × 256 × 2 (K+V) × 0.5625 = 18 KiB/token.
+
+For your 196k pool: 196,000 × 18 KiB ≈ 3.4 GiB (+ ~80 MiB fixed SSM state). If it were a dense 27B, the same config would be ~14 GiB — that's almost certainly why --no-kv-offload ended up in your script in the first place (probably added back when KV was f16 or the model was different). It no longer earns its keep.
+
+3. Your "196k ÷ 3" theory: right result, wrong mechanism
+
+I checked server.cpp — the pool is only auto-scaled to n_parallel × per-slot when you use --kv-unified-per-slot without -c. Since you pin -c 196000:
+
+With --kv-unified: one shared pool of 196k tokens total, not three 196k contexts. So yes, you're right that it's not 3×196k.
+But it's not "64k each" either. It's a shared budget: each slot may grow to 196k, and the sum of all live slots is capped at 196k. Three concurrent 80k sessions won't fit (240k > 196k) — the pool then defrags/evicts.
+4. Your VRAM budget after the fix
+Item	GiB
+Weights Q4_K_M (file size)	16.8
+mmproj-F16	~0.9
+MTP draft module	~0.3
+Compute buffers (FA, graph)	~1–2
+= your current 22.2 GiB ✓	
+KV pool (moves from RAM→VRAM)	~3.5
+Total	~25.7
+
+~6 GiB of headroom on your 32 GiB Arc. It fits comfortably. (q8_0 KV would double the pool to ~6.7 GiB → ~28.9 GiB total; still fits but tight — keep q4_0, which is the sensible choice for a hybrid model anyway.)
+
+5. Minor notes
+--load-mode none is a real flag (no mmap: model is read fully into RAM, then copied to GPU). Fine, but it causes a transient ~17 GiB RAM spike at boot; the default auto/mmap avoids it on Windows.
+Display on the 3080 changes nothing — a headless Arc compute device is the ideal setup (no display framebuffer reservation).
+-t 4, --fit off, GGML_SYCL_USM_SYSTEM=0, ZE_SHARED_FORCE_DEVICE_ALLOC=1 are all fine.
+Verify
+
+After removing --no-kv-offload, the startup log (you have -lv 4) should show offload_kqv = 1 and the KV buffer allocated on SYCL0, and your Arc should sit around 25–26 GiB used. Decoding at long context should get noticeably faster, since attention no longer shuttles KV between DDR5 (~50–90 GB/s) and VRAM (~512 GB/s) — which is the main reason it "wasn't working well."
+
+Usage 417K tok
+Ran for 89m 04s
+9/20 21:36
+/s
+613.47.761.722 I slot print_timing: id  0 | task 68670 | n_gen =    833, tg =  23.65 t/s, tg_3s =  24.60 t/s
+613.50.899.894 I slot print_timing: id  0 | task 68670 | n_gen =    909, tg =  23.69 t/s, tg_3s =  24.22 t/s
+613.54.051.780 I slot print_timing: id  0 | task 68670 | n_gen =    985, tg =  23.72 t/s, tg_3s =  24.12 t/s
+613.57.193.598 I slot print_timing: id  0 | task 68670 | n_gen =   1057, tg =  23.67 t/s, tg_3s =  22.91 t/s
+614.00.205.115 I slot print_timing: id  0 | task 68670 | n_gen =   1131, tg =  23.74 t/s, tg_3s =  24.57 t/s
+614.03.349.808 I slot print_timing: id  0 | task 68670 | n_gen =   1210, tg =  23.81 t/s, tg_3s =  25.12 t/s
+
+I get around 25 tps normally with 1 agent; but i spin up subagents. The kv cache seems to be in ram... like the whole thing. I have things running decently, but when I have 2-3 aggents working at once, thgings really slow down to like 5 tps,. and my ram spikes. agents on dsh need a fair amount of context as the system prompt is long.
+9/21 05:44
+Retried model request (1/5) · 1s
+Think
+The user is showing me a Task Manager screenshot:
+
+That screenshot tells the whole story — and there are actually two things eating your RAM, plus one physics limit. Let me walk through it.
+
+What your RAM is currently holding (22.5 GB of 31.8)
+Item	Size	Cause
+Model weights	~16.8 GB	--load-mode none — no mmap, so the whole GGUF sits resident in RAM and gets copied to the Arc
+KV pool (196k, shared)	~3.5 GB	--no-kv-offload — the entire unified pool is in host memory
+OS + other	~2 GB	—
+
+That's ~22.3 GB — exactly your 22.5. The 0.2 GB under "Shared GPU memory" is just SYCL staging; the real KV is in plain RAM, and because you set GGML_SYCL_ENABLE_HOST_PINNED_MEM=0 it's pageable host memory — so every attention step copies KV across the CPU↔GPU boundary.
+
+Why 1 agent = 24 t/s but 3 agents = 5 t/s
+
+Two effects, only one of which is fixable:
+
+Fixable — KV traffic per step. Each decode step, attention over every active agent's history is read from RAM. 3 agents × ~40k context = ~2.2 GB of KV read per step at ~50–90 GB/s RAM bandwidth, vs ~1–2 ms if it's in VRAM (≈10× faster). With one agent the history is small enough that the weight read (16.8 GB from VRAM every step) dominates, so 24 t/s survives.
+Physics — GPU time is shared. With 3 concurrent slots, each step does 3× the sequence work (FFN + attention) on the same silicon. Even with everything in VRAM, 3 agents will top out around ~17–20 t/s aggregate ≈ 6 t/s each on this model. So 5 → ~6–7 t/s per agent is the realistic ceiling; the 5 t/s you see is mostly effect #1 dragging it down.
+The fix — two lines out
+powershell
+Copy
+# delete these two lines:
+        --load-mode none `
+        --no-kv-offload `
+
+That's it. Everything else in your script stays.
+
+New budgets:
+
+VRAM: 22.2 (weights+mmproj+MTP+compute) + 3.5 (KV pool) ≈ 25.7 GB / 32 — ~6 GB headroom for FA workspaces and 3 slots. Fits.
+RAM: drops from 22.5 GB to ~6–8 GB (OS + working set). No more spikes — the spike you saw was KV traffic + staging piling on top of the resident model.
+Optional upgrades once that's working
+Bump the pool to native 262k. Your model's trained context is 262,144 (from the GGUF metadata). 262k × 18 KiB ≈ 4.5 GiB → total ≈ 26.7 GB. Still fits. DSH agents with long system prompts benefit from more pool headroom before defrag/eviction kicks in:
+powershell
+Copy
+--ctx-size 262144 `
+q8_0 KV if you want better long-context quality: pool doubles to ~6.7 GiB → ~28.9 GB total. Fits, but headroom gets tight with 3 slots' FA workspaces — try it and watch VRAM.
+Keep --parallel 3 — that's exactly your agent count, and with --kv-unified the pool is shared (confirmed in server.cpp): 3 agents compete for the 196k/262k total budget, each slot may grow up to the full size. Just remember 3 × 90k contexts (270k) would exceed the pool — if your agents routinely run that long, that's the limit, not RAM.
+Expected results after the change
+1 agent: ~28–30 t/s (attention no longer RAM-bound)
+2–3 agents: ~6–7 t/s each (~18–20 aggregate), RAM steady at ~6–8 GB, Arc VRAM ~25.7 GB
+Task Manager should show "Dedicated" ~25–26 GB and "Shared GPU memory" back near 0
+
+If after this you want more multi-agent throughput, the levers are context size per agent (smallest context that preserves quality) or a smaller model — not RAM, which is no longer in the loop.
+
+Usage 49.2K tok
+Ran for 26m 29s
+9/21 06:11
+are you positive about those parameters??? That load mode none seems to bypass ram when loading the model...
+9/21 19:34
+Think
+The user is questioning my claim about `--load-mode none`. They think "load mode none seems to bypass RAM when loading the model" — that is, they think `none` means loading directly to the GPU without going through RAM, and that removing it would actually increase RAM usage.
+
+Fair challenge — let me verify against the actual loader code instead of asserting from memory. Re-reading the source now:
+
+Bash
+Verify load-mode none vs mmap in loader source
+Context compacted
+Compacted 33 history items (~24559 tokens)
+System prompt
+and no-kv-offload SOUNDS like it would avoid offloading kv to ram...
+9/21 20:16
+Context injection
+skill-catalog
+Retried model request (1/5) · 1s
+Think
+The user is pointing out that `--no-kv-offload` semantically sounds like "do not offload the KV to RAM," i.e., something that would keep the KV in VRAM. This is a naming pitfall. Let me explain the semantics precisely:
+
+The naming is genuinely misleading — let me show you the exact code path rather than argue semantics.
+
+Bash
+Show where offload_kqv selects KV cache device
+Context injection
+@deepseek-ai/dsh-system-prompt
+Think
+Let's look at the important line: `src/llama-graph.cpp:2725: if (!cparams.offload_kqv) {` — let's see what it's doing. And the kv_cache constructor that takes `offload_kqv` as the `offload` parameter. Let's grab the relevant snippet:
+Failed
+Bash
+Show KV offload device selection and mmap load branch
+Retried model request (1/5) · 1s
+Think
+/tmp gets wiped between calls — need to clone and run everything in a single call. Re-running with a combined clone.
+
+/tmp wiped again — combined re-clone:
+
+Bash
+Show KV offload device selection in kv cache source
+Retried model request (1/5) · 1s
+Think
+Now, let me look at line 216 of kv-cache.cpp to check what `if (offload)` is doing — that's the device selection. Also, I want to finish the mmap/none load verification. One more integrated call:
+Failed
+Bash
+Show KV device selection and loader mmap branch
+Retried model request (1/5) · 1s
+Think
+The clone from the previous call is also gone — meaning /tmp is being wiped between every single call, including... wait, in the previous call the clone succeeded and the grep worked. Now /tmp/s is gone. So yeah, it really is wiped per call. Every time I have to combine everything into a single call. I'll bundle the remaining 2 checks into the clone call.
+Bash
+Re-clone and show KV device selection plus loader mmap branch
+Retried model request (1/5) · 1s
+Think
+Got the important KV evidence:
+
+The KV question is now settled with direct code. One more pass to close out the load-mode question too:
+
+Bash
+Show how load-mode none vs mmap is handled in file loading
+Retried model request (1/5) · 1s
+Think
+I've got enough information to answer both questions definitively.
+
+I have the KV answer nailed down now. One last check on the load path to be fully honest about what none does with the file bytes:
+
+Failed
+Bash
+Show mmap vs plain file read branch in model loader
+Retried model request (2/5) · 2s
+Think
+sed failed due to arithmetic on negative numbers (because L was empty, $((L-8)) → "0-8" → -8, and sed treated it as an option). The main findings have already been obtained:
+Bash
+Show mmap and non-mmap file read branches
+Think
+Now I have everything I need. Let me write the final answer.
+
+Both doubts are now answered with code in hand — and both flag names are genuinely misleading, but the code is unambiguous.
+
+1. --no-kv-offload — your reading is exactly backwards
+
+In llama.cpp, "offload" always means "move to the GPU" (it's the same word as in -ngl 99, "offload 99 layers to GPU"). "offload to RAM" isn't a thing in this codebase — RAM is the default resting place, and offload is the act of taking it out of RAM. The chain of code:
+
+Step 1 — common/common.cpp:1745:
+
+cpp
+Copy
+cparams.offload_kqv = !params.no_kv_offload;   // default (no flag) = true
+
+Step 2 — src/llama-kv-cache.cpp, per-layer KV buffer allocation (this is the actual device choice):
+
+cpp
+Copy
+const char * dev_name = "CPU";
+ggml_backend_buffer_type_t buft = ggml_backend_cpu_buffer_type();
+
+if (offload) {                          // offload == cparams.offload_kqv
+    auto * dev = model.dev_layer(il);   // your Arc, SYCL0
+    buft = ggml_backend_dev_buffer_type(dev);
+    dev_name = ggml_backend_dev_name(dev);
+}
+
+So: no flag → KV allocated on the GPU. Your --no-kv-offload → KV allocated on the CPU (system RAM).
+
+Step 3 — src/llama-graph.cpp:2725, the comment says it outright:
+
+cpp
+Copy
+if (!cparams.offload_kqv) {
+    // all nodes between the KV store and the attention output are run on the CPU
+    ggml_backend_sched_set_tensor_backend(sched, cur, backend_cpu);
+}
+
+So the flag means "don't offload the KV to the GPU" = "keep the KV in RAM." It is precisely the flag that created your RAM problem, not the flag that would avoid it.
+
+2. --load-mode none — this also does not bypass RAM
+
+There is no disk→VRAM path in llama.cpp; weights always pass through host memory. The flag only chooses which kind of host memory (src/llama-model.cpp):
+
+auto (default) = mmap: the file is memory-mapped, and the mapped region is handed to the backend via ggml_backend_dev_buffer_from_host_ptr(dev, addr, ...) (line ~1784). Those pages are file-backed — they count as "used" RAM in Task Manager but the OS can evict/reclaim them under pressure.
+none: use_mmap = false → the loader reads the entire 16.8 GB file into a private RAM buffer — note the comment at line 1862:
+cpp
+Copy
+// without mmap, load non-host buffers first: their tensors go through a staging buffer, ...
+That's a hard, non-reclaimable copy. It's the most RAM-hungry mode, not the leanest.
+
+Your screenshot is the empirical proof: steady-state 22.5 GB RAM ≈ 16.8 (model held by --load-mode none) + 3.5 (KV held by --no-kv-offload) + ~2 (OS). If none had "bypassed RAM," you wouldn't see a steady 22.5 GB after 10 minutes of runtime.
+
+So the advice stands
+powershell
+Copy
+# delete both of these lines:
+        --load-mode none `
+        --no-kv-offload `
+KV (3.5 GiB) → VRAM. Arc: 22.2 → ~25.7 GiB / 32.
+Model's hard RAM copy → reclaimable file-backed pages. System RAM: 22.5 → ~6–8 GB.
+Attention stops copying KV across the CPU↔GPU boundary every step, which is what's crushing your 3-agent case.
+Usage 348K tok
+Ran for 138m 32s
+9/21 21:53
+Message or run a task... / commands, @ files or sessions
+Workspace Write
+Qwen3.8-27B-Q4_K_M-Thinking
+Medium
+3 turns · 22 steps| LLM 238m49s · Tool call 30.8s| TTFT avg 6m2s · 6.2 tok/s| Cache hit 50%| Input 775K tok · Output 39.6K tok
+Details
+Click a tool row in the message flow to view its details

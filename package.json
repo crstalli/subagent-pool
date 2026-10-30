@@ -1,0 +1,15 @@
+{
+  "name": "subagent-pool-e2e",
+  "version": "1.0.0",
+  "description": "E2E Playwright testing for the subagent-pool Cordis plugin in a separate DSH profile",
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "shell-quote": "^1.8.1"
+  },
+  "scripts": {
+    "test": "node test/e2e.js",
+    "test-ui": "node test/e2e.js --ui",
+    "start-test-server": "node test/start-server.js",
+    "stop-test-server": "node test/stop-server.js"
+  }
+}
