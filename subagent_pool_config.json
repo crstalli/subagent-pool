@@ -1,0 +1,39 @@
+{
+  "version": 3,
+  "enabled": true,
+  "totalCap": 5,
+  "queueMaxWaitSec": 300,
+  "queueMaxLen": 20,
+  "routes": [
+    {
+      "provider": "qwen-un",
+      "model": "qwen 3.8un",
+      "cap": 3,
+      "tier": "deep",
+      "maxThinking": "",
+      "profile": {
+        "thinking": "medium",
+        "speed": "medium",
+        "instructions": "high-level ok",
+        "bestFor": "deep reasoning, multi-step work",
+        "avoidFor": "trivial lookups",
+        "notes": "Qwen3.8-27B Uncensored HauhauCS-Aggressive on Intel Arc (llama-server :8001, SYCL) — same local server as the main session"
+      }
+    },
+    {
+      "provider": "bonzai-rtx",
+      "model": "rtx-bonzi",
+      "cap": 2,
+      "tier": "easy",
+      "maxThinking": "",
+      "profile": {
+        "thinking": "off",
+        "speed": "fast",
+        "instructions": "very explicit required",
+        "bestFor": "extraction, formatting, mechanical transforms",
+        "avoidFor": "deep reasoning",
+        "notes": "Ternary Bonsai-2 27B PTQ1_0 on RTX 3080 (llama-server :8080)"
+      }
+    }
+  ]
+}

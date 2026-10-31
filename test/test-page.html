@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { background: #1a1a2e; color: #fff; font-family: system-ui, -apple-system, sans-serif; }
+* { box-sizing: border-box; }
+input, select { font-family: inherit; font-size: 13px; }
+#pool-debug { margin-top: 16px; font-size: 11px; color: #888; white-space: pre-wrap; max-width: 600px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="pool-debug">loading...</div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+const mockStatus = {
+  enabled: true, totalCap: 2, totalRunning: 0,
+  routes: [
+    {
+      provider: 'arc', model: 'qwen3.8-27b-k4_xl-thinking', cap: 1, tier: 'deep', maxThinking: 'high',
+      profile: { thinking: 'high', speed: 'medium', instructions: 'high-level ok', bestFor: 'deep reasoning, multi-step analysis', avoidFor: 'trivial lookups', notes: 'Qwen 3.8 on Intel Arc GPU' },
+      running: 0, idle: 0
+    },
+    {
+      provider: 'bonzai-rtx', model: 'rtx-bonzi', cap: 1, tier: 'deep', maxThinking: 'medium',
+      profile: { thinking: 'medium', speed: 'fast', instructions: 'high-level ok', bestFor: 'code edits, quick analysis', avoidFor: 'deep reasoning', notes: 'Bonsai-2 on RTX 3080' },
+      running: 0, idle: 0
+    }
+  ],
+  queue: { total: 0, maxLen: 20, maxWaitSec: 300, perRoute: {}, waiting: [] }
+};
+
+const mockCatalog = {
+  ok: true,
+  providers: [
+    { provider: 'arc', models: { qwen38_27b: { label: 'Qwen 3.8 27B (XL)' }, qwen38_27b_medium: { label: 'Qwen 3.8 27B (Medium)' } } },
+    { provider: 'ollama_local', models: { gemma4_12b: { label: 'Gemma 4 12B' } } },
+    { provider: 'bonzai-rtx', models: { rtx_bonzi: { label: 'Bonsai 27B (RTX 3080)' } } }
+  ]
+};
+
+const mockModelInfo = {
+  'arc/qwen38_27b': { ok: true, provider: 'arc', model: 'qwen38_27b', reasoning: { efforts: [{ id: 'low' }, { id: 'medium' }, { id: 'high', name: 'Extended' }, { id: 'xhigh' }], defaultEffort: 'medium', max: 'xhigh' } },
+  'arc/qwen38_27b_medium': { ok: true, provider: 'arc', model: 'qwen38_27b_medium', reasoning: { efforts: [{ id: 'low' }, { id: 'medium' }, { id: 'high' }], defaultEffort: 'low' } },
+  'bonzai-rtx/rtx_bonzi': { ok: true, provider: 'bonzai-rtx', model: 'rtx_bonzi', reasoning: { efforts: [{ id: 'medium' }, { id: 'high' }], defaultEffort: 'medium' } },
+  'ollama_local/gemma4_12b': { ok: true, provider: 'ollama_local', model: 'gemma4_12b', reasoning: { efforts: [], defaultEffort: 'low', max: 'low' } }
+};
+
+window.host = {
+  call: function (method, args) {
+    if (method === 'pool.status') return Promise.resolve(mockStatus);
+    if (method === 'pool.models') return Promise.resolve(mockCatalog);
+    if (method === 'pool.modelInfo') {
+      var key = (args && args.provider && args.model) ? (args.provider + '/' + args.model) : '';
+      return Promise.resolve(mockModelInfo[key] || { ok: false, error: 'unknown model' });
+    }
+    if (method === 'pool.configure') {
+      if (args && typeof args.totalCap === 'number') mockStatus.totalCap = args.totalCap;
+      if (args && Array.isArray(args.routes)) mockStatus.routes = args.routes;
+      if (args && typeof args.enabled === 'boolean') mockStatus.enabled = args.enabled;
+      return Promise.resolve({ ok: true, status: mockStatus, message: 'configured' });
+    }
+    return Promise.resolve({ ok: true });
+  }
+};
+
+fetch('/pool-client-v5.js')
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  })
+  .then(function(code) {
+    try {
+      var plugin = eval('(function(){' + code + '})()');
+      // Create a mock ctx that has interval (the plugin's apply closure needs it)
+      var ctx = {
+        get: function(k) {
+          return undefined;
+        },
+        interval: function(fn, ms) {
+          return function() {};
+        }
+      };
+      plugin.apply(ctx);
+    } catch(e) {
+      console.error('[test] error:', e.message);
+    }
+    
+    if (typeof PoolPage === 'function') {
+      ReactDOM.render(React.createElement(PoolPage), document.getElementById('root'));
+      document.getElementById('pool-debug').textContent = 'PoolPage rendered successfully';
+    } else {
+      document.getElementById('pool-debug').textContent = 'ERROR: PoolPage is not a function';
+    }
+  })
+  .catch(function(e) {
+    document.getElementById('pool-debug').textContent = 'ERROR: ' + e.message;
+    console.error('[test] fetch error:', e.message);
+  });
+</script>
+</body>
+</html>

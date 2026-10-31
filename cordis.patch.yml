@@ -1,0 +1,7 @@
+# Subagent Pool — Cordis plugin for DeepSeek Harness
+# Loads the host half and registers the client half.
+- insert:
+    - id: subagent-pool
+      name: './index.js'
+
+
