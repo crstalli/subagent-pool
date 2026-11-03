@@ -9,6 +9,15 @@
     "./client": "./dsh/client.js",
     "./package.json": "./package.json"
   },
+  "files": [
+    "index.js",
+    "dsh/client.js",
+    "cordis.patch.yml",
+    "package.json"
+  ],
+  "engines": {
+    "dsh": ">=0.2.0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

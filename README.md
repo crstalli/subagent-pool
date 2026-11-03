@@ -1,14 +1,29 @@
-# Subagent Pool
+# dsh-subagent-pool
 
 Cordis plugin for DeepSeek Harness that manages concurrent subagents per model, routes tasks to the right model, queues at capacity, and exposes a Settings card in the Web GUI.
 
 ## Installation
 
+### From GitHub
+
 ```bash
 dsh plugin --profile web add github:crstalli/subagent-pool
 ```
 
+If pnpm asks to allow the build script, add this to your profile's `pnpm-workspace.yaml`:
+
+```yaml
+allowBuilds:
+  dsh-subagent-pool: true
+```
+
 Then restart `dsh web`.
+
+### From local directory
+
+```bash
+dsh plugin --profile web add /path/to/dsh-subagent-pool
+```
 
 ## Features
 
@@ -65,9 +80,9 @@ Pool settings are stored in `subagent_pool_config.json`:
 
 ## Architecture
 
-- **Host half**: Manages subagent lifecycle, routing, queuing, and config I/O
-- **Client half**: Renders the Settings card UI in the Web GUI
-- **Config**: Persisted to `subagent_pool_config.json` in the plugin directory
+- **Host half** (`index.js`): Manages subagent lifecycle, routing, queuing, and config I/O. Registered via `cordis.patch.yml`.
+- **Client half** (`dsh/client.js`): Renders the Settings card UI. Loaded automatically by `cordis-client-runner` via the `dsh.client` manifest.
+- **Config**: Persisted to `subagent_pool_config.json` in the plugin directory.
 
 ## License
 
