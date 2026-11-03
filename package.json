@@ -1,15 +1,24 @@
 {
-  "name": "subagent-pool-e2e",
+  "name": "dsh-subagent-pool",
   "version": "1.0.0",
-  "description": "E2E Playwright testing for the subagent-pool Cordis plugin in a separate DSH profile",
-  "dependencies": {
-    "playwright": "^1.63.0",
-    "shell-quote": "^1.8.1"
+  "description": "Subagent Pool: caps concurrent subagents per model, routes to the right model, queues at capacity, and exposes a Settings card in the Web GUI.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./dsh/client.js",
+    "./package.json": "./package.json"
   },
-  "scripts": {
-    "test": "node test/e2e.js",
-    "test-ui": "node test/e2e.js --ui",
-    "start-test-server": "node test/start-server.js",
-    "stop-test-server": "node test/stop-server.js"
-  }
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "dependencies": {},
+  "license": "MIT"
 }

@@ -3,3 +3,6 @@ test/.server-pid
 test/e2e-*.png
 test/settings-body.txt
 test/console-errors.txt
+*.log
+.dsh-module-fallback/
+config/
