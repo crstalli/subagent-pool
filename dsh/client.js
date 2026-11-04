@@ -1,12 +1,12 @@
 window.__ModuleLoader__.load(
   {
-    id: "@local/subagent-pool-boot",
+    id: "dsh-subagent-pool",
     factory: (require) => {
       var module = { exports: {} };
       var exports = module.exports;
 
-      var NAME = "subagent-pool-boot";
-      var KEY = "subagent-pool-boot";
+      var NAME = "subagent-pool";
+      var KEY = "subagent-pool";
       var ROUTE = "/subagent-pool";
 
       var T = {
@@ -589,15 +589,17 @@ window.__ModuleLoader__.load(
             var slots = scope.slots;
             if (!slots) return;
             if (!Card) {
-              console.error('[subagent-pool-boot] React not available, card skipped');
+              console.error('[subagent-pool] React not available, card skipped');
               return;
             }
-            slots.register(
-              { name: 'settings.plugin.item', id: NAME, key: KEY, order: 30 },
-              Card
-            );
+            scope.slots.inject("settings.plugin.item", function* () {
+              yield scope.slots.register(
+                { name: 'settings.plugin.item', id: NAME, key: 'subagent-model-selection', order: 10 },
+                Card
+              );
+            });
           } catch (err) {
-            console.error('[subagent-pool-boot] register failed:', err);
+            console.error('[subagent-pool] register failed:', err);
           }
         });
       }

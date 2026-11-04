@@ -1,7 +1,9 @@
 # Subagent Pool — Cordis plugin for DeepSeek Harness
-# Loads the host half and registers the client half.
+# Loads the host half (ESM plugin with name/inject/apply exports)
+# and the client half (dsh/client.js registered via __ModuleLoader__ for web).
+# The cordis.patch.yml inserts the plugin row by package name so Node resolution
+# finds the installed module. The client is auto-loaded by DSH's client module
+# loader from the dsh/client.js export (declared in package.json exports).
 - insert:
     - id: subagent-pool
-      name: './index.js'
-
-
+      name: 'dsh-subagent-pool'

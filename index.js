@@ -687,6 +687,25 @@ export function apply(ctx, config) {
     }
   });
 
+  // ---- register settings section for browser card pairing ----
+
+  ctx.inject(['settings'], (settingsScope) => {
+    if (settingsScope.settings) {
+      try {
+        settingsScope.settings.installSection(ctx, NS_SELECTION, null, null, {
+          label: 'Subagent Pool',
+          onChange: () => {
+            log('pool: settings change detected');
+            processQueue();
+          }
+        });
+        log('pool: settings section installed');
+      } catch (e) {
+        log('pool: settings installSection failed: ' + e);
+      }
+    }
+  });
+
   registerEffects();
   boot().catch(function (e) { log('pool: boot failed: ' + e); });
 }
