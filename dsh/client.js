@@ -5,6 +5,8 @@ window.__ModuleLoader__.load(
       var module = { exports: {} };
       var exports = module.exports;
 
+      var React = require("react");
+
       var NAME = "subagent-pool";
       var KEY = "subagent-pool";
       var ROUTE = "/subagent-pool";
