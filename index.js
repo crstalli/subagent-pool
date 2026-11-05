@@ -687,14 +687,30 @@ export function apply(ctx, config) {
     }
   });
 
-  // ---- register settings section for browser card pairing ----
+  // ---- register a dedicated settings namespace for the browser card pairing ----
+  // The client card is keyed to `subagent-pool`; describe() lists this
+  // namespace as served, so ConfigurablePluginsTabController dispatches the
+  // pool card into the Settings "Plugins" tab. We do NOT reuse
+  // `subagent-model-selection` (NS_SELECTION) — DSH's SubagentModelSelectionConfig
+  // already registers it, so a second registration would throw on boot.
+  // describe() needs schema.toJSON(); resolve() invokes the schema as a
+  // function, so a plain callable stub satisfies both without an import.
+  const NS_POOL = 'subagent-pool';
+  const poolSchema = function (value) { return value; };
+  poolSchema.toJSON = function () {
+    return { type: 'object', additionalProperties: true };
+  };
 
   ctx.inject(['settings'], (settingsScope) => {
     if (settingsScope.settings) {
       try {
-        settingsScope.settings.installSection(ctx, NS_SELECTION, null, null, {
-          label: 'Subagent Pool',
-          onChange: () => {
+        settingsScope.settings.installSection(ctx, NS_POOL, poolSchema, {
+          enabled: false,
+          totalCap: 0,
+          routes: []
+        }, {
+          setSource: function () {},
+          onChange: function () {
             log('pool: settings change detected');
             processQueue();
           }
