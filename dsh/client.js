@@ -600,6 +600,14 @@ window.__ModuleLoader__.load(
                 Card
               );
             });
+            // Also register in agent-presets section's configurable slot
+            // so the card appears under Agent presets tab, not just Plugins tab.
+            scope.slots.inject("settings.agentPresets.configurable", function* () {
+              yield scope.slots.register(
+                { name: 'settings.agentPresets.configurable', id: NAME, key: 'subagent-model-selection', order: 10 },
+                Card
+              );
+            });
           } catch (err) {
             console.error('[subagent-pool] register failed:', err);
           }

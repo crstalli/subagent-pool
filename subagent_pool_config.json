@@ -10,14 +10,14 @@
       "model": "qwen 3.8un",
       "cap": 3,
       "tier": "deep",
-      "maxThinking": "",
+      "maxThinking": "high",
       "profile": {
-        "thinking": "medium",
+        "thinking": "high",
         "speed": "medium",
         "instructions": "high-level ok",
-        "bestFor": "deep reasoning, multi-step work",
+        "bestFor": "story rewriting, planning, long-form writing, detailed analysis",
         "avoidFor": "trivial lookups",
-        "notes": "Qwen3.8-27B Uncensored HauhauCS-Aggressive on Intel Arc (llama-server :8001, SYCL) — same local server as the main session"
+        "notes": "Qwen 3.8 UN on Arc Gateway (localhost:8001)"
       }
     },
     {

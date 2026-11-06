@@ -1,0 +1,19 @@
+# Test-instance patch for `dsh web --patch pooltest-bridge-patch.yml --port 3082 --no-open`
+#
+# The web profile's chrome-eye-bridge entry defaults to port 3081 (guiPort 3080),
+# which is already held by the MAIN instance's bridge. Without this override the
+# test instance's bridge child respawn-loops (EADDRINUSE, 2s retry, no cap).
+#
+# Non-insert patch semantics (dsh-app-boot applyEntryPatches): `config` is
+# REPLACED wholesale, so the full config block is repeated here.
+#
+# The cordis-toolset insert is intentionally NOT repeated here: it already lives
+# in the web profile's user layer (~/.dsh/profiles/web/cordis.patch.yml), and a
+# second insert of the same id crashes boot with "duplicate loader entry id".
+- id: chrome-eye-bridge
+  name: '@local/chrome-eye-bridge'
+  config:
+    bridgePath: /mnt/f/ai/chrome-eye/bridge/bridge.mjs
+    node: /mnt/f/nvm/versions/node/v24.19.0/bin/node
+    port: 3085
+    guiPort: 3082
