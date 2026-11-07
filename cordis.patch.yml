@@ -7,3 +7,7 @@
 - insert:
     - id: subagent-pool
       name: 'dsh-subagent-pool'
+      config:
+        enabled: false
+        totalCap: 0
+        routes: []
