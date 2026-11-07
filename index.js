@@ -397,7 +397,7 @@ export function apply(ctx, config) {
   let nsActivated = false;
   function savePrevSelection() {
     try {
-      if (settings) { prevSelection = settings.get(NS_SELECTION); hasPrev = !!prevSelection; }
+      if (settings) { const desc = settings.describe().find(r => r.ns === NS_SELECTION); if (desc) { prevSelection = desc.value; hasPrev = !!prevSelection; } }
     } catch (e) {}
   }
   function applyNamespace() {
@@ -704,17 +704,11 @@ export function apply(ctx, config) {
   ctx.inject(['settings'], (settingsScope) => {
     if (settingsScope.settings) {
       try {
-        settingsScope.settings.installSection(ctx, NS_POOL, poolSchema, {
+        settingsScope.settings.update(NS_POOL, {
           enabled: false,
           totalCap: 0,
           routes: []
-        }, {
-          setSource: function () {},
-          onChange: function () {
-            log('pool: settings change detected');
-            processQueue();
-          }
-        });
+        }).catch(function (e) { log('pool: settings update failed: ' + e); });
         log('pool: settings section installed');
       } catch (e) {
         log('pool: settings installSection failed: ' + e);
