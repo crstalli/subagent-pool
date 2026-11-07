@@ -13,7 +13,8 @@
     "index.js",
     "dsh/client.js",
     "cordis.patch.yml",
-    "package.json"
+    "package.json",
+    "subagent_pool_config.json"
   ],
   "engines": {
     "dsh": ">=0.2.0"

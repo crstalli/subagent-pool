@@ -11,7 +11,8 @@ export function apply(ctx, config) {
   // ---- log helper ----
   const log = function (m) { try { console.log(m); } catch (e) {} };
 
-  const CONFIG_PATH = '/mnt/f/ai/plugins/subagent_pool_config.json';
+  // Config path: relative to plugin install directory for portability
+  const CONFIG_PATH = pathResolve(__dirname, '..', 'subagent_pool_config.json');
   const NS_SELECTION = 'subagent-model-selection';
   const NS_DEFAULT = 'agent-default-model';
 
