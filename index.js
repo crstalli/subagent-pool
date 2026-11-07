@@ -12,6 +12,8 @@ export function apply(ctx, config) {
   const log = function (m) { try { console.log(m); } catch (e) {} };
 
   // Config path: relative to plugin install directory for portability
+  // In ESM, use import.meta.url to resolve __dirname equivalent
+  const __dirname = pathResolve(new URL('.', import.meta.url).pathname);
   const CONFIG_PATH = pathResolve(__dirname, '..', 'subagent_pool_config.json');
   const NS_SELECTION = 'subagent-model-selection';
   const NS_DEFAULT = 'agent-default-model';
