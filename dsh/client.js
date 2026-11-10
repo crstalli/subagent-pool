@@ -594,17 +594,15 @@ window.__ModuleLoader__.load(
               console.error('[subagent-pool] React not available, card skipped');
               return;
             }
-            scope.slots.inject("settings.plugin.item", function* () {
+            // Render the card on this bundle's detail page in the Plugins
+            // screen: v0.2.2-rc.1 renders `plugins.bundle.config` keyed by the
+            // bundle package name with view 'page' (plugin-manager client.js).
+            // The previous targets (settings.plugin.item,
+            // settings.agentPresets.configurable) are not declared slots in
+            // this version, so the card never rendered anywhere.
+            scope.slots.inject("plugins.bundle.config", function* () {
               yield scope.slots.register(
-                { name: 'settings.plugin.item', id: NAME, key: 'subagent-model-selection', order: 10 },
-                Card
-              );
-            });
-            // Also register in agent-presets section's configurable slot
-            // so the card appears under Agent presets tab, not just Plugins tab.
-            scope.slots.inject("settings.agentPresets.configurable", function* () {
-              yield scope.slots.register(
-                { name: 'settings.agentPresets.configurable', id: NAME, key: 'subagent-model-selection', order: 10 },
+                { name: 'plugins.bundle.config', id: NAME, key: 'dsh-subagent-pool', order: 10 },
                 Card
               );
             });

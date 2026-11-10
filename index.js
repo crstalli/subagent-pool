@@ -15,7 +15,11 @@ export function apply(ctx, config) {
   // In ESM, use import.meta.url to resolve __dirname equivalent
   const __dirname = pathResolve(new URL('.', import.meta.url).pathname);
   const CONFIG_PATH = pathResolve(__dirname, 'subagent_pool_config.json');
-  const NS_SELECTION = 'subagent-model-selection';
+  // Registered by @deepseek-ai/dsh-tool-subagent (model-selection-settings.js
+  // exports name = 'subagent-model-selection-settings'); settings.update() takes
+  // the profile entry id, so this must match exactly or every write throws
+  // "No configurable plugin entry".
+  const NS_SELECTION = 'subagent-model-selection-settings';
   const NS_DEFAULT = 'agent-default-model';
 
   // Canonical thinking-effort ladder
@@ -403,12 +407,19 @@ export function apply(ctx, config) {
       if (settings) { const desc = settings.describe().find(r => r.ns === NS_SELECTION); if (desc) { prevSelection = desc.value; hasPrev = !!prevSelection; } }
     } catch (e) {}
   }
-  function applyNamespace() {
+  function applyNamespace(retry) {
     if (!settings || !configState) return Promise.resolve();
     if (!nsActivated) savePrevSelection();
     nsActivated = true;
     const allowedModels = configState.routes.map(function (r) { return { provider: r.provider, model: r.model }; });
-    return settings.update(NS_SELECTION, { enabled: true, allowedModels: allowedModels }).catch(function (e) { log('pool: namespace update failed: ' + e); });
+    return settings.update(NS_SELECTION, { enabled: true, allowedModels: allowedModels }).then(function () {
+      log('pool: namespace applied (' + NS_SELECTION + ', ' + allowedModels.length + ' routes)');
+    }).catch(function (e) {
+      log('pool: namespace update failed: ' + e);
+      // The owning entry may not be registered yet when the pool activates;
+      // retry briefly instead of silently dropping the steering.
+      if ((retry || 0) < 10) setTimeout(function () { applyNamespace((retry || 0) + 1); }, 3000);
+    });
   }
   function restoreNamespace() {
     if (!settings || !nsActivated) return Promise.resolve();
@@ -690,34 +701,11 @@ export function apply(ctx, config) {
     }
   });
 
-  // ---- register a dedicated settings namespace for the browser card pairing ----
-  // The client card is keyed to `subagent-pool`; describe() lists this
-  // namespace as served, so ConfigurablePluginsTabController dispatches the
-  // pool card into the Settings "Plugins" tab. We do NOT reuse
-  // `subagent-model-selection` (NS_SELECTION) — DSH's SubagentModelSelectionConfig
-  // already registers it, so a second registration would throw on boot.
-  // describe() needs schema.toJSON(); resolve() invokes the schema as a
-  // function, so a plain callable stub satisfies both without an import.
-  const NS_POOL = 'subagent-pool';
-  const poolSchema = function (value) { return value; };
-  poolSchema.toJSON = function () {
-    return { type: 'object', additionalProperties: true };
-  };
-
-  ctx.inject(['settings'], (settingsScope) => {
-    if (settingsScope.settings) {
-      try {
-        settingsScope.settings.update(NS_POOL, {
-          enabled: false,
-          totalCap: 0,
-          routes: []
-        }).catch(function (e) { log('pool: settings update failed: ' + e); });
-        log('pool: settings section installed');
-      } catch (e) {
-        log('pool: settings installSection failed: ' + e);
-      }
-    }
-  });
+  // NOTE: there is no `subagent-pool` settings namespace. settings.update()
+  // only merges into entries that declare a Config schema, and this plugin
+  // deliberately keeps its config in subagent_pool_config.json, so a write to
+  // a non-existent 'subagent-pool' entry always threw "No configurable plugin
+  // entry" at boot. Removed — the pool reads its own JSON file.
 
   registerEffects();
   boot().catch(function (e) { log('pool: boot failed: ' + e); });
