@@ -45,7 +45,6 @@ export const Config = Schema.object({
 });
 
 export function apply(ctx, config) {
-  liveCfg = config; // live Config-entry handles (declared `Config` schema above)
   // ---- log helper ----
   const log = function (m) { try { console.log(m); } catch (e) {} };
 
@@ -77,7 +76,7 @@ export function apply(ctx, config) {
   // as Volatile handles with .get(); plain values are used as-is. `cs()` is the
   // single read path for pool state so edits made through the Settings GUI /
   // settings.update('subagent-pool', …) take effect without a plugin reload.
-  let liveCfg = null;
+  let liveCfg = config; // live Config-entry handles (declared `Config` schema above)
   function field(f, dflt) {
     const v = liveCfg ? liveCfg[f] : undefined;
     if (v === undefined || v === null) return dflt;
