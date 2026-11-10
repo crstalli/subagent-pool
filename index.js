@@ -33,10 +33,13 @@ const RouteSchema = Schema.object({
   maxThinking: Schema.string().default(''),
   profile: RouteProfileSchema
 });
+// Schema is deliberately permissive at load time (the shipped cordis.patch.yml
+// row uses enabled:false / totalCap:0 as the off state); runtime semantics
+// (totalCap >= 1, non-empty routes) stay enforced by validateConfig().
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).volatile(),
-  totalCap: Schema.number().min(1).default(2).volatile(),
-  queueMaxWaitSec: Schema.number().min(1).default(300).volatile(),
+  totalCap: Schema.natural().default(2).volatile(),
+  queueMaxWaitSec: Schema.number().min(0).default(300).volatile(),
   queueMaxLen: Schema.natural().default(20).volatile(),
   routes: Schema.array(RouteSchema).default([]).volatile()
 });
