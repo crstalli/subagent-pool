@@ -82,7 +82,16 @@ window.__ModuleLoader__.load(
       }
 
       function CardFactory(react) {
-        return function PoolPage() {
+        return function PoolPage(props) {
+          // Slot ownerProps: { view, form? } — on the row page
+          // (plugins.row.config, key "<pkg>#<rowId>") the plugin manager passes
+          // form = { state: ConfigFormSnapshot, mutate(ops, revision) } for this
+          // plugin's own configurable entry ('subagent-pool'). When present we
+          // read initial values from form.state.value and save via form.mutate
+          // (the standard volatile-settings write path); otherwise we fall back
+          // to the /subagent-pool/configure HTTP endpoint.
+          var formRef = React.useRef(null);
+          formRef.current = (props && props.form) || null;
           var [statusVal, setStatusVal] = React.useState(null);
           var [errVal, setErrVal] = React.useState(null);
           var [formVal, setFormVal] = React.useState({ enabled: false, totalCap: 2, routes: [] });
@@ -184,6 +193,25 @@ window.__ModuleLoader__.load(
           function configure(patch) {
             setBusyVal(true);
             setLastErrorVal(null);
+            var f = formRef.current;
+            if (f && f.state && f.state.status === 'ready' && typeof f.mutate === 'function') {
+              // Standard path: atomic volatile write to our own entry.
+              var cur = f.state.value || {};
+              var ops = [
+                { op: 'set', path: ['enabled'], value: patch.enabled === true },
+                { op: 'set', path: ['totalCap'], value: patch.totalCap },
+                { op: 'set', path: ['queueMaxWaitSec'], value: typeof cur.queueMaxWaitSec === 'number' ? cur.queueMaxWaitSec : 300 },
+                { op: 'set', path: ['queueMaxLen'], value: Number.isInteger(cur.queueMaxLen) ? cur.queueMaxLen : 20 },
+                { op: 'set', path: ['routes'], value: patch.routes }
+              ];
+              f.mutate(ops, f.state.revision)
+                .then(function (ok) {
+                  if (ok === true) { refresh(); } else { setLastErrorVal('settings rejected the write'); }
+                })
+                .catch(function (e) { setLastErrorVal(e && e.message ? e.message : String(e)); })
+                .then(function () { setBusyVal(false); });
+              return;
+            }
             configureApi(patch)
               .then(function (res) {
                 if (res && res.ok === true) {
@@ -199,6 +227,23 @@ window.__ModuleLoader__.load(
                 setBusyVal(false);
               });
           }
+
+          // Adopt the entry's current values as the form's initial state when
+          // the host supplies a form (row page); the /status poll below still
+          // fills the form when no form prop is present.
+          React.useEffect(function () {
+            var f = formRef.current;
+            if (!f || !f.state || f.state.status !== 'ready' || !f.state.value) return;
+            var v = f.state.value;
+            setFormVal(function (cur2) {
+              if (cur2.routes.length > 0) return cur2;
+              return {
+                enabled: v.enabled === true,
+                totalCap: typeof v.totalCap === 'number' ? v.totalCap : 2,
+                routes: Array.isArray(v.routes) && v.routes.length > 0 ? v.routes.map(normRoute) : cur2.routes
+              };
+            });
+          }, [props && props.form && props.form.state]);
 
           React.useEffect(function () {
             refresh();
@@ -607,16 +652,27 @@ window.__ModuleLoader__.load(
             scope.slots.inject("plugins.bundle.config", function* () {
               yield scope.slots.register(
                 { name: 'plugins.bundle.config', id: NAME, key: 'dsh-subagent-pool', order: 10 },
-                Card
+                function (props) { return Card(props); }
               );
             });
-            // Also give the pool a page inside Settings -> Plugins
+            // Standard third-party config page: the row page inside the bundle
+            // (Plugins -> dsh-subagent-pool -> subagent-pool row) renders
+            // plugins.row.config keyed "<pkg>#<rowId>" and passes
+            // form = { state, mutate } for this entry's Config schema — the
+            // cookbook path (form.state / form.mutate, volatile hot-apply).
+            scope.slots.inject("plugins.row.config", function* () {
+              yield scope.slots.register(
+                { name: 'plugins.row.config', id: NAME, key: 'dsh-subagent-pool#subagent-pool', order: 10 },
+                function (props) { return Card(props); }
+              );
+            });
+            // Also give the pool a page inside Settings -> Built-in plugins
             // (documented slot contract: settings.plugins.tab, list, options
             // id/order/label; the section owner renders label as the tab).
             scope.slots.inject("settings.plugins.tab", function* () {
               yield scope.slots.register(
                 { name: 'settings.plugins.tab', id: 'subagent-pool', order: 60, label: 'Subagent Pool' },
-                Card
+                function (props) { return Card(props); }
               );
             });
           } catch (err) {
