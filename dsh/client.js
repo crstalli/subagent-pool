@@ -384,7 +384,11 @@ window.__ModuleLoader__.load(
             )
           ));
 
-          for (var i = 0; i < formVal.routes.length; i++) {
+          // NOTE: `let`, not `var` — every row's onChange/onClick closure below
+          // captures this loop index; with `var` they all saw the final value
+          // (routes.length), so row controls wrote to a phantom out-of-range
+          // index (appending junk rows) and Remove was a no-op.
+          for (let i = 0; i < formVal.routes.length; i++) {
             var r = formVal.routes[i];
             if (r === null || r === undefined) {
               r = { provider: '', model: '', cap: 1, tier: '', maxThinking: '', profile: emptyProfile() };
