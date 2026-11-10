@@ -368,22 +368,23 @@ window.__ModuleLoader__.load(
             }
           }
 
+          var chipStyle = { background: T.border, borderRadius: 3, padding: '1px 6px', fontSize: 11, color: T.muted, whiteSpace: 'nowrap' };
           if (statusVal && Array.isArray(statusVal.routes) && statusVal.routes.length > 0) {
-            card.push(React.createElement('div', { key: 'routes-status', style: { marginTop: 8 } }));
+            card.push(React.createElement('div', { key: 'routes-h', style: Object.assign({}, smallMuted, { marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Routes'));
             for (var ri = 0; ri < statusVal.routes.length; ri++) {
               var sr = statusVal.routes[ri];
               var sp = (sr && sr.profile && typeof sr.profile === 'object') ? sr.profile : {};
-              card.push(React.createElement('div', { key: 'sr-' + ri, style: { display: 'flex', flexDirection: 'column', gap: 2, background: T.field, border: '1px solid ' + T.border, borderRadius: 6, padding: 8, marginTop: 4 } },
-                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                  React.createElement('span', { style: { fontWeight: 'bold', color: T.text, fontSize: 12, width: 160, flexShrink: 0 } }, (sr.provider || '') + '/' + (sr.model || '')),
-                  React.createElement('span', { style: smallMuted }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + '  running ' + (sr.running || 0) + '/' + (sr.cap || 0) + '  idle ' + (sr.idle || 0)),
-                  (sr.tier ? React.createElement('span', { key: 'tier', style: smallMuted }, '[' + sr.tier + ']') : null)
+              card.push(React.createElement('div', { key: 'sr-' + ri, style: { display: 'flex', flexDirection: 'column', gap: 6, background: T.field, border: '1px solid ' + T.border, borderRadius: 8, padding: '8px 10px', marginTop: 6 } },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                  React.createElement('span', { style: { fontWeight: 'bold', color: T.text, fontSize: 12, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' } }, (sr.provider || '') + '/' + (sr.model || '')),
+                  React.createElement('span', { key: 'stats', style: chipStyle }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + ' · running ' + (sr.running || 0) + ' · idle ' + (sr.idle || 0)),
+                  (sr.tier ? React.createElement('span', { key: 'tier', style: chipStyle }, sr.tier) : null)
                 ),
-                React.createElement('div', { style: { display: 'flex', gap: 6, fontSize: 11, color: T.muted, flexWrap: 'wrap' } },
-                  React.createElement('span', { key: 'mt', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'max-thinking: ' + (sr.maxThinking || 'none')),
-                  React.createElement('span', { key: 'best', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'good for: ' + (sp.bestFor || '—')),
-                  React.createElement('span', { key: 'avoid', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'avoid: ' + (sp.avoidFor || '—')),
-                  React.createElement('span', { key: 'notes', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'notes: ' + (sp.notes || '—'))
+                React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                  React.createElement('span', { key: 'mt', style: chipStyle }, 'max-thinking: ' + (sr.maxThinking || 'none')),
+                  React.createElement('span', { key: 'best', style: chipStyle }, 'good for: ' + (sp.bestFor || '—')),
+                  React.createElement('span', { key: 'avoid', style: chipStyle }, 'avoid: ' + (sp.avoidFor || '—')),
+                  React.createElement('span', { key: 'notes', style: chipStyle }, 'notes: ' + (sp.notes || '—'))
                 )
               ));
             }
@@ -407,7 +408,8 @@ window.__ModuleLoader__.load(
             ));
           }
 
-          card.push(React.createElement('div', { key: 'form', style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 } }));
+          card.push(React.createElement('div', { key: 'form-h', style: Object.assign({}, smallMuted, { marginTop: 16, paddingTop: 12, borderTop: '1px solid ' + T.border, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Configure'));
+          card.push(React.createElement('div', { key: 'form', style: { display: 'flex', flexDirection: 'column', gap: 10 } }));
           card.push(React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13, color: T.text } },
             React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
               React.createElement('input', {
@@ -452,7 +454,7 @@ window.__ModuleLoader__.load(
               var pvSel = React.createElement('select', {
                 key: 'pv',
                 value: r.provider,
-                style: Object.assign({}, selectStyle, { flex: 1, minWidth: 110 }),
+                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, model: '', maxThinking: '' }); }
               }, pvOptsArr);
               line1.push(pvSel);
@@ -466,7 +468,7 @@ window.__ModuleLoader__.load(
               var mdSel = React.createElement('select', {
                 key: 'md',
                 value: r.model,
-                style: Object.assign({}, selectStyle, { flex: 1.4, minWidth: 130 }),
+                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }, moArr);
               line1.push(mdSel);
@@ -476,7 +478,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.provider,
                 placeholder: 'provider',
-                style: Object.assign({}, inputStyle, { flex: 1, minWidth: 110 }),
+                style: Object.assign({}, inputStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, maxThinking: '' }); }
               }));
               line1.push(React.createElement('input', {
@@ -484,7 +486,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.model,
                 placeholder: 'model',
-                style: Object.assign({}, inputStyle, { flex: 1.4, minWidth: 130 }),
+                style: Object.assign({}, inputStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }));
             }
@@ -493,7 +495,7 @@ window.__ModuleLoader__.load(
               type: 'number',
               min: 0,
               value: r.cap,
-              style: Object.assign({}, inputStyle, { width: 56, flexShrink: 0 }),
+              style: Object.assign({}, inputStyle, { width: '100%' }),
               onChange: function (e) { updateRoute(i, { cap: capNum(e.target.value) }); }
             }));
             line1.push(React.createElement('button', {
@@ -501,7 +503,7 @@ window.__ModuleLoader__.load(
               style: { background: 'none', border: 'none', color: T.err, cursor: 'pointer', fontSize: 14, padding: 0, width: 24, height: 24, borderRadius: 4 },
               onClick: function () { removeRoute(i); },
               title: 'Remove route'
-            }, '\u2152'));
+            }, '\u00D7'));
 
             var mtOpts = efforts.length > 0 ? efforts.map(function (e) { return e.id; }) : EFFORT_LADDER.slice();
             if (r.maxThinking && mtOpts.indexOf(r.maxThinking) === -1) mtOpts.push(r.maxThinking);
@@ -517,7 +519,7 @@ window.__ModuleLoader__.load(
             var mtSel = React.createElement('select', {
               key: 'mt',
               value: r.maxThinking,
-              style: Object.assign({}, selectStyle, { width: 150 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateRoute(i, { maxThinking: e.target.value }); }
             }, mtArr);
             var line2 = [mtSel];
@@ -530,7 +532,7 @@ window.__ModuleLoader__.load(
             var ptSel = React.createElement('select', {
               key: 'pt',
               value: p.thinking,
-              style: Object.assign({}, selectStyle, { flex: 1, minWidth: 90 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'thinking', e.target.value); }
             }, ptArr);
             var psArr = [];
@@ -541,7 +543,7 @@ window.__ModuleLoader__.load(
             var psSel = React.createElement('select', {
               key: 'ps',
               value: p.speed,
-              style: Object.assign({}, selectStyle, { flex: 1, minWidth: 90 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'speed', e.target.value); }
             }, psArr);
             var piArr = [];
@@ -552,7 +554,7 @@ window.__ModuleLoader__.load(
             var piSel = React.createElement('select', {
               key: 'pi',
               value: p.instructions,
-              style: Object.assign({}, selectStyle, { flex: 1.3, minWidth: 110 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'instructions', e.target.value); }
             }, piArr);
             var line3 = [ptSel, psSel, piSel];
@@ -584,39 +586,37 @@ window.__ModuleLoader__.load(
               })
             ];
 
-            card.push(React.createElement('div', { key: 'fr-' + i, style: { display: 'flex', flexDirection: 'column', gap: 6, border: '1px dashed ' + T.border, borderRadius: 8, padding: 10, background: T.field } },
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'route'),
+            card.push(React.createElement('div', { key: 'fr-' + i, style: { display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid ' + T.border, borderRadius: 8, padding: 10, background: T.field, marginTop: 8 } },
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr) 60px 26px', gap: 8, alignItems: 'center' } },
                 line1[0], line1[1], line1[2], line1[3]
               ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'max thinking'),
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '110px 190px', gap: 8, alignItems: 'center' } },
+                React.createElement('span', { style: smallMuted }, 'max thinking'),
                 line2[0]
               ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'profile'),
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
                 line3[0], line3[1], line3[2]
               ),
-              line4[0], line4[1], line4[2]
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
+                line4[0], line4[1], line4[2]
+              )
             ));
           }
 
-          card.push(React.createElement('button', {
-            key: 'add-route',
-            style: Object.assign({}, btnStyle, { alignSelf: 'flex-start' }),
-            onClick: function () { addRoute(); }
-          }, '+ Add route'));
-
-          card.push(React.createElement('button', {
-            key: 'save',
-            style: Object.assign({}, btnStyle, { alignSelf: 'flex-start' }),
-            disabled: busyVal,
-            onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
-          }, 'Save'));
-
-          if (lastErrorVal) {
-            card.push(React.createElement('div', { key: 'last-err', style: { fontSize: 12, color: T.err } }, lastErrorVal));
-          }
+          card.push(React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' } },
+            React.createElement('button', {
+              key: 'add-route',
+              style: btnStyle,
+              onClick: function () { addRoute(); }
+            }, '+ Add route'),
+            React.createElement('button', {
+              key: 'save',
+              style: btnStyle,
+              disabled: busyVal,
+              onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
+            }, busyVal ? 'Saving…' : 'Save'),
+            lastErrorVal ? React.createElement('span', { key: 'last-err', style: { fontSize: 12, color: T.err } }, lastErrorVal) : null
+          ));
 
           return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 720, padding: 16, fontSize: 13, color: T.text, fontFamily: 'inherit' } }, card);
         };
