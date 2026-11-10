@@ -610,6 +610,15 @@ window.__ModuleLoader__.load(
                 Card
               );
             });
+            // Also give the pool a page inside Settings -> Plugins
+            // (documented slot contract: settings.plugins.tab, list, options
+            // id/order/label; the section owner renders label as the tab).
+            scope.slots.inject("settings.plugins.tab", function* () {
+              yield scope.slots.register(
+                { name: 'settings.plugins.tab', id: 'subagent-pool', order: 60, label: 'Subagent Pool' },
+                Card
+              );
+            });
           } catch (err) {
             console.error('[subagent-pool] register failed:', err);
           }
