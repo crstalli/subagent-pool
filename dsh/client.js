@@ -349,7 +349,10 @@ window.__ModuleLoader__.load(
             padding: '5px 8px',
             fontSize: 13,
             color: T.text,
-            fontFamily: 'inherit'
+            fontFamily: 'inherit',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden'
           };
           var selectStyle = Object.assign({}, inputStyle, { appearance: 'none', cursor: 'pointer', paddingRight: 18 });
           var btnStyle = {
@@ -481,6 +484,7 @@ window.__ModuleLoader__.load(
               var pvSel = React.createElement('select', {
                 key: 'pv',
                 value: r.provider,
+                title: r.provider || 'provider',
                 style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, model: '', maxThinking: '' }); }
               }, pvOptsArr);
@@ -495,6 +499,7 @@ window.__ModuleLoader__.load(
               var mdSel = React.createElement('select', {
                 key: 'md',
                 value: r.model,
+                title: r.model || 'model',
                 style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }, moArr);
@@ -626,7 +631,7 @@ window.__ModuleLoader__.load(
               React.createElement('span', { style: smallMuted }, 'cap'),
               line1[2]
             );
-            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '34px minmax(0,1fr) minmax(0,1.3fr) 92px 28px 28px', gap: 8, alignItems: 'center' } },
+            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '34px minmax(0,0.85fr) minmax(0,1.6fr) 92px 28px 28px', gap: 8, alignItems: 'center' } },
               sw, line1[0], line1[1], capBox, chev, line1[3]
             )];
             if (isOpen) {
