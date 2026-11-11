@@ -144,7 +144,7 @@ window.__ModuleLoader__.load(
           formRef.current = (props && props.form) || null;
           var [statusVal, setStatusVal] = React.useState(null);
           var [errVal, setErrVal] = React.useState(null);
-          var [formVal, setFormVal] = React.useState({ enabled: false, totalCap: 2, routes: [] });
+          var [formVal, setFormVal] = React.useState({ enabled: false, totalCap: 2, totalCapAuto: false, routes: [] });
           var [busyVal, setBusyVal] = React.useState(false);
           var [lastErrorVal, setLastErrorVal] = React.useState(null);
           var [catalogVal, setCatalogVal] = React.useState(null);
@@ -159,6 +159,7 @@ window.__ModuleLoader__.load(
               return {
                 enabled: p.enabled !== undefined ? p.enabled : f.enabled,
                 totalCap: p.totalCap !== undefined ? p.totalCap : f.totalCap,
+                totalCapAuto: p.totalCapAuto !== undefined ? p.totalCapAuto : f.totalCapAuto,
                 routes: p.routes !== undefined ? p.routes : f.routes
               };
             });
@@ -175,7 +176,7 @@ window.__ModuleLoader__.load(
                 nr.profile = Object.assign({}, (nr.profile || {}), patch.profile);
               }
               routes[i] = nr;
-              return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
+              return { enabled: f.enabled, totalCap: f.totalCap, totalCapAuto: f.totalCapAuto, routes: routes };
             });
           }
 
@@ -187,7 +188,7 @@ window.__ModuleLoader__.load(
               }
               var prof = Object.assign({}, (routes[i].profile || {}), { [field]: value });
               routes[i] = Object.assign({}, routes[i], { profile: prof });
-              return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
+              return { enabled: f.enabled, totalCap: f.totalCap, totalCapAuto: f.totalCapAuto, routes: routes };
             });
           }
 
@@ -196,7 +197,7 @@ window.__ModuleLoader__.load(
             setFormVal(function (f) {
               var routes = f.routes.slice();
               routes.push({ provider: '', model: '', cap: 1, tier: '', maxThinking: '', profile: emptyProfile() });
-              return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
+              return { enabled: f.enabled, totalCap: f.totalCap, totalCapAuto: f.totalCapAuto, routes: routes };
             });
             setOpenVal(function (o) { var n = Object.assign({}, o); n[idx] = true; return n; });
           }
@@ -251,7 +252,7 @@ window.__ModuleLoader__.load(
             setFormVal(function (f) {
               var routes = f.routes.slice();
               routes.splice(i, 1);
-              return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
+              return { enabled: f.enabled, totalCap: f.totalCap, totalCapAuto: f.totalCapAuto, routes: routes };
             });
           }
 
@@ -267,11 +268,12 @@ window.__ModuleLoader__.load(
                   if (s && Array.isArray(s.routes) && s.routes.length > 0) {
                     return {
                       enabled: s.enabled === true,
-                      totalCap: typeof s.totalCap === 'number' ? s.totalCap : 2,
+                      totalCap: typeof s.totalCapStored === 'number' ? s.totalCapStored : (typeof s.totalCap === 'number' ? s.totalCap : 2),
+                      totalCapAuto: s.totalCapAuto === true,
                       routes: s.routes.map(normRoute)
                     };
                   }
-                  return { enabled: false, totalCap: 2, routes: DEFAULT_ROUTES.map(normRoute) };
+                  return { enabled: false, totalCap: 2, totalCapAuto: false, routes: DEFAULT_ROUTES.map(normRoute) };
                 });
               })
               .catch(function (e) {
@@ -300,6 +302,7 @@ window.__ModuleLoader__.load(
               var ops = [
                 { op: 'set', path: ['enabled'], value: patch.enabled === true },
                 { op: 'set', path: ['totalCap'], value: patch.totalCap },
+                { op: 'set', path: ['totalCapAuto'], value: patch.totalCapAuto === true },
                 { op: 'set', path: ['queueMaxWaitSec'], value: typeof cur.queueMaxWaitSec === 'number' ? cur.queueMaxWaitSec : 300 },
                 { op: 'set', path: ['queueMaxLen'], value: Number.isInteger(cur.queueMaxLen) ? cur.queueMaxLen : 20 },
                 { op: 'set', path: ['routes'], value: patch.routes }
@@ -340,6 +343,7 @@ window.__ModuleLoader__.load(
               return {
                 enabled: v.enabled === true,
                 totalCap: typeof v.totalCap === 'number' ? v.totalCap : 2,
+                totalCapAuto: v.totalCapAuto === true,
                 routes: Array.isArray(v.routes) && v.routes.length > 0 ? v.routes.map(normRoute) : cur2.routes
               };
             });
@@ -426,6 +430,12 @@ window.__ModuleLoader__.load(
           }
 
           var smallMuted = { fontSize: 11, color: T.muted };
+          // auto total cap = sum of enabled route caps (min 1)
+          var autoCap = formVal.routes.reduce(function (sum, r) {
+            var c = r && Number(r.cap);
+            return sum + (Number.isFinite(c) && c > 0 ? c : 0);
+          }, 0);
+          if (autoCap < 1) autoCap = 1;
           var badgeStyle = {
             display: 'inline-block',
             borderRadius: 6,
@@ -451,7 +461,8 @@ window.__ModuleLoader__.load(
               React.createElement('span', { key: 'running', style: smallMuted },
                 'Running: ' +
                 (statusVal && statusVal.totalRunning != null ? statusVal.totalRunning : 0) + ' / ' +
-                (statusVal && statusVal.totalCap != null ? statusVal.totalCap : 2)
+                (statusVal && statusVal.totalCap != null ? statusVal.totalCap : 2) +
+                (statusVal && statusVal.totalCapAuto ? ' (auto)' : '')
               )
             ));
             if (statusVal && statusVal.inactiveReason) {
@@ -516,10 +527,21 @@ window.__ModuleLoader__.load(
               React.createElement('input', {
                 type: 'number',
                 min: 0,
-                value: formVal.totalCap,
+                value: formVal.totalCapAuto ? autoCap : formVal.totalCap,
+                disabled: formVal.totalCapAuto === true,
+                title: formVal.totalCapAuto ? 'Auto: sum of route caps' : 'Maximum concurrent subagents',
                 className: 'dsp-input', style: { width: 56 },
                 onChange: function (e) { patchForm({ totalCap: capNum(e.target.value) }); }
               })
+            ),
+            React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' } },
+              React.createElement(Switch, {
+                on: formVal.totalCapAuto === true,
+                label: 'Total cap auto',
+                title: 'Auto: total cap = sum of route caps (' + autoCap + ')',
+                onClick: function () { patchForm({ totalCapAuto: formVal.totalCapAuto !== true }); }
+              }),
+              React.createElement('span', { className: 'dsp-label', style: { fontSize: 13 } }, 'auto = ' + autoCap)
             )
           ));
 
@@ -726,7 +748,15 @@ window.__ModuleLoader__.load(
               key: 'save',
               className: 'dsp-btn dsp-btn-primary',
               disabled: busyVal,
-              onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
+              onClick: function () {
+                var auto = formVal.totalCapAuto === true;
+                configure({
+                  enabled: formVal.enabled,
+                  totalCap: auto ? autoCap : formVal.totalCap,
+                  totalCapAuto: auto,
+                  routes: formVal.routes
+                });
+              }
             }, busyVal ? 'Saving…' : 'Save'),
             lastErrorVal ? React.createElement('span', { key: 'last-err', style: { fontSize: 12, color: T.err } }, lastErrorVal) : null
           ));

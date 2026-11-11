@@ -39,6 +39,9 @@ const RouteSchema = Schema.object({
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).volatile(),
   totalCap: Schema.natural().default(2).volatile(),
+  // totalCapAuto: when true, the effective global cap is the sum of the
+  // route caps (one slot per configured subagent), recomputed live.
+  totalCapAuto: Schema.boolean().default(false).volatile(),
   queueMaxWaitSec: Schema.number().min(0).default(300).volatile(),
   queueMaxLen: Schema.natural().default(20).volatile(),
   routes: Schema.array(RouteSchema).default([]).volatile()
@@ -88,6 +91,7 @@ export function apply(ctx, config) {
       version: 3,
       enabled: field('enabled', true) === true,
       totalCap: field('totalCap', 2),
+      totalCapAuto: field('totalCapAuto', false) === true,
       queueMaxWaitSec: field('queueMaxWaitSec', 300),
       queueMaxLen: field('queueMaxLen', 20),
       routes: field('routes', [])
@@ -120,6 +124,22 @@ export function apply(ctx, config) {
       }
     }
     return configState;
+  }
+
+  // Effective global concurrency cap: in auto mode it is the sum of all
+  // enabled route caps (min 1 so the pool stays valid when every route is
+  // toggled off); otherwise the stored totalCap.
+  function effCap() {
+    const c = cs();
+    if (c && c.totalCapAuto === true && Array.isArray(c.routes)) {
+      let sum = 0;
+      for (let i = 0; i < c.routes.length; i++) {
+        const r = c.routes[i];
+        if (r && Number.isInteger(r.cap) && r.cap > 0) sum += r.cap;
+      }
+      return Math.max(1, sum);
+    }
+    return (c && typeof c.totalCap === 'number') ? c.totalCap : 1;
   }
 
   // ---- queue state (in-memory only) ----
@@ -346,7 +366,7 @@ export function apply(ctx, config) {
         continue;
       }
       if (e.totalOnly) {
-        if (totalRunning + admittedTotal < cs().totalCap) {
+        if (totalRunning + admittedTotal < effCap()) {
           log('pool: queue admit total (waited ' + Math.round((Date.now() - e.since) / 1000) + 's)');
           settleEntry(e, null);
           i--;
@@ -354,7 +374,7 @@ export function apply(ctx, config) {
         continue;
       }
       const rk = (c.byRoute[e.key] ? c.byRoute[e.key].running : 0) + (admitted[e.key] || 0);
-      if (rk >= rcfg.cap || totalRunning + admittedTotal >= cs().totalCap) continue;
+      if (rk >= rcfg.cap || totalRunning + admittedTotal >= effCap()) continue;
       admitted[e.key] = (admitted[e.key] || 0) + 1;
       admittedTotal++;
       log('pool: queue admit ' + e.key + ' (waited ' + Math.round((Date.now() - e.since) / 1000) + 's)');
@@ -425,12 +445,12 @@ export function apply(ctx, config) {
       const c = counts();
       const rc = c.byRoute[key] ? c.byRoute[key].running : 0;
       if (rcfg.cap <= 0) return Promise.resolve({ kind: 'deny', reason: 'Subagent pool: route ' + route.provider + '/' + route.model + ' has cap 0 (disabled).' });
-      if (rc < rcfg.cap && c.totalRunning < cs().totalCap) return Promise.resolve(null);
+      if (rc < rcfg.cap && c.totalRunning < effCap()) return Promise.resolve(null);
       return waitInQueue(route, key, exec && exec.signal, false);
     }
     if (name === 'workflow' || name === 'ralph') {
       const c = counts();
-      if (c.totalRunning < cs().totalCap) return Promise.resolve(null);
+      if (c.totalRunning < effCap()) return Promise.resolve(null);
       return waitInQueue(defaultRoute(), 'total', exec && exec.signal, true);
     }
     return Promise.resolve(null);
@@ -464,7 +484,9 @@ export function apply(ctx, config) {
     const c = counts();
     const out = { enabled: enabled };
     if (cs() && Array.isArray(cs().routes)) {
-      out.totalCap = cs().totalCap;
+      out.totalCap = effCap();
+      out.totalCapAuto = cs().totalCapAuto === true;
+      out.totalCapStored = (typeof cs().totalCap === 'number') ? cs().totalCap : 2;
       out.totalRunning = c.totalRunning;
       out.routes = cs().routes.map(routeView);
       out.queue = {
@@ -526,6 +548,7 @@ export function apply(ctx, config) {
     const patch = {
       enabled: cfg.enabled === true,
       totalCap: cfg.totalCap,
+      totalCapAuto: cfg.totalCapAuto === true,
       queueMaxWaitSec: cfg.queueMaxWaitSec,
       queueMaxLen: cfg.queueMaxLen,
       routes: cfg.routes
@@ -588,7 +611,7 @@ export function apply(ctx, config) {
         text: function () {
           if (!enabled || !cs()) return '';
           const lines = [];
-          lines.push('Subagent pool active: max ' + cs().totalCap + ' concurrent. Routes (pick the one that fits the task):');
+          lines.push('Subagent pool active: max ' + effCap() + ' concurrent' + (cs().totalCapAuto === true ? ' (auto = sum of route caps)' : '') + '. Routes (pick the one that fits the task):');
           for (let i = 0; i < cs().routes.length; i++) {
             const r = cs().routes[i];
             const p = r.profile || {};
@@ -762,6 +785,7 @@ export function apply(ctx, config) {
           version: 3,
           enabled: r.enabled !== undefined ? (r.enabled === true) : (base ? base.enabled === true : true),
           totalCap: r.totalCap !== undefined ? r.totalCap : base.totalCap,
+          totalCapAuto: r.totalCapAuto !== undefined ? (r.totalCapAuto === true) : (base ? base.totalCapAuto === true : false),
           queueMaxWaitSec: r.queueMaxWaitSec !== undefined ? r.queueMaxWaitSec : (typeof base.queueMaxWaitSec === 'number' ? base.queueMaxWaitSec : 300),
           queueMaxLen: r.queueMaxLen !== undefined ? r.queueMaxLen : (Number.isInteger(base.queueMaxLen) ? base.queueMaxLen : 20),
           routes: r.routes !== undefined ? r.routes : base.routes
@@ -777,6 +801,7 @@ export function apply(ctx, config) {
             await settings.update(name, {
               enabled: next.enabled === true,
               totalCap: next.totalCap,
+              totalCapAuto: next.totalCapAuto === true,
               queueMaxWaitSec: next.queueMaxWaitSec,
               queueMaxLen: next.queueMaxLen,
               routes: next.routes
