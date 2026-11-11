@@ -1,0 +1,48 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+ai
+New Session
+F:\ai\plugins\subagent-pool - can you do
+49min
+Call the subagent tool exactly
+54min
+Ping Pong Subagent Verification
+57min
+Test Subagent Tool Invocation
+1h
+Call the subagent tool exactly
+1h
+Show 40 more sessions
+cztl
+Ungrouped
+More
+Into the Unknown
+Preview
+ai
+Creator mode
+Describe what you want to build, / commands, @ files or sessions
+Full access
+Qwen3.8-27B-Q4_K_M-Thinking
+Default
+Settings
+General
+Models
+Built-in plugins
+Agent presets
+Open configuration file
+Close
+Built-in plugins
+
+Inspect the plugins this deployment ships.
+
+Plugin list
+Subagent Pool
+Subagent Pool
+Enabled
+Total cap
++ Add route
+Save

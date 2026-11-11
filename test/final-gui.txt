@@ -1,0 +1,5 @@
+settings tab present: true
+settings card h3: 1, ACTIVE badge: false, rows: 0
+bundle page card h3: 1
+row page card h3: 1
+after row-form save, status totalCap: 4

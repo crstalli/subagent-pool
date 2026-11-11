@@ -1,0 +1,71 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+New Session
+I want to remake monopoly
+1h
+Okay. I had a subagent
+5d
+Let me check readPrefix's return
+5d
+I ahve several broken dsh
+5d
+You are a brilliant literary
+5d
+Show 28 more sessions
+ai
+cztl
+Ungrouped
+More
+Into the Unknown
+Preview
+f
+Creator mode
+Describe what you want to build, / commands, @ files or sessions
+Full access
+nvidia/nemotron-3-ultra-550b-a55b
+Default
+Settings
+General
+Models
+Built-in plugins
+Agent presets
+Open configuration file
+Close
+Models
+
+Enter your API keys to use models from the following providers.
+
+DeepSeek
+Edit
+nvidia
+Edit
+Delete
+Ollama Local
+Custom
+Edit
+Delete
+bonzai-rtx-img
+Custom
+Edit
+Delete
+bonzai-rtxz
+Custom
+Edit
+Delete
+Arc Gateway
+Custom
+Edit
+Delete
+rtx-bonzai
+Custom
+Edit
+Delete
+qwen-un
+Custom
+Edit
+Delete
+Add model provider

@@ -1,0 +1,75 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+New Session
+I want to remake monopoly
+1h
+Okay. I had a subagent
+5d
+Let me check readPrefix's return
+5d
+I ahve several broken dsh
+5d
+You are a brilliant literary
+5d
+Show 28 more sessions
+ai
+cztl
+Ungrouped
+More
+Into the Unknown
+Preview
+f
+Creator mode
+Describe what you want to build, / commands, @ files or sessions
+Full access
+nvidia/nemotron-3-ultra-550b-a55b
+Default
+Settings
+General
+Models
+Built-in plugins
+Agent presets
+Open configuration file
+Close
+Permission
+Choose the default permission mode for new sessions
+Full access
+Language
+English
+Appearance
+Light
+Dark
+System
+Font size
+Only affects conversation content
+14
+px
+Work details
+Choose how much detail to show for tool calls
+Detailed
+When to Collapse Work Details
+Choose when to automatically collapse work details
+On completion
+Replies After Collapse
+Choose which assistant replies stay visible when work details collapse
+All replies
+Show coding view
+Shows trajectory, code diffs, and all Agent presets
+Keyboard shortcuts
+
+View and edit available shortcuts and input actions
+
+Edit shortcuts
+Send behavior while busy
+What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior
+Queue
+Performance & usage
+Choose how much performance and usage information to show
+Detailed
+Upload Session Log when using the official model API
+Help improve DeepSeek models and products.
+Current version: 0.2.2-rc.1

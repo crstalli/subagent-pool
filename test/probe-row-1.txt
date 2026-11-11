@@ -1,0 +1,92 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+ai
+New Session
+F:\ai\plugins\subagent-pool - can you do
+27min
+Call the subagent tool exactly
+35min
+Test Subagent Tool
+37min
+Call the subagent tool exactly
+1h
+Ping Pong Subagent Verification
+1h
+Show 42 more sessions
+cztl
+Ungrouped
+F:\ai\dsh-agent-swarm --- Readme.md. Cre
+3d
+More
+Plugins
+Uninstall
+dsh-subagent-pool
+v1.0.0
+
+dsh-subagent-pool
+
+Subagent Pool: caps concurrent subagents per model, routes to the right model, queues at capacity, and exposes a Settings card in the Web GUI.
+
+dsh-subagent-pool
+
+Cordis plugin for DeepSeek Harness that manages concurrent subagents per model, routes tasks to the right model, queues at capacity, and exposes a Settings card in the Web GUI.
+
+Installation
+From GitHub
+bash
+dsh plugin --profile web add github:crstalli/subagent-pool
+
+If pnpm asks to allow the build script, add this to your profile's pnpm-workspace.yaml:
+
+yaml
+allowBuilds:
+  dsh-subagent-pool: true
+
+Then restart dsh web.
+
+From local directory
+bash
+dsh plugin --profile web add /path/to/dsh-subagent-pool
+Features
+Per-model capacity: Set caps on concurrent subagents per model/provider
+Route-based distribution: Route tasks to different models based on tier (deep/easy)
+Queue management: Queue requests at capacity with configurable max wait and max queue length
+Settings card: Configure pool via Settings > Plugins > Subagent Pool section
+Config file: Persistent configuration via subagent_pool_config.json
+Configuration
+
+Pool settings are stored in subagent_pool_config.json:
+
+json
+{
+  "enabled": true,
+  "totalCap": 2,
+  "routes": [
+    { "provider": "qwen_local", "model": "qwen38_27b_medium", "cap": 1, "tier": "deep" },
+    { "provider": "ollama_local", "model": "gemma4_12b", "cap": 1, "tier": "easy" }
+  ],
+  "queueMaxWaitSec": 120,
+  "queueMaxLen": 50
+}
+Fields
+Field	Type	Default	Description
+enabled	boolean	true	Enable/disable the pool
+totalCap	number	2	Maximum total concurrent subagents
+routes	array	see above	Route definitions per model
+queueMaxWaitSec	number	120	Max seconds a request waits in queue
+queueMaxLen	number	50	Maximum queue length
+Route Fields
+Field	Type	Description
+provider	string	Provider key (e.g., qwen_local, ollama_local)
+model	string	Model identifier
+cap	number	Concurrent subagent cap for this route
+tier	string	Task tier (deep or easy)
+maxThinking	string	Max thinking level (optional)
+profile	object	Per-route profile settings (optional)
+Usage
+Open Settings > Plugins > Subagent Pool
+Configure routes, 

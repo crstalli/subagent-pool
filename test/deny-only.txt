@@ -1,0 +1,40 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+ai
+Running
+Call subagent with Nvidia model
+now
+Subagent tool test
+11min
+work on the chrome-eye skill..
+27min
+F:\ai\plugins\subagent-pool - can you do
+30min
+Test subagent tool call
+1h
+Show 46 more sessions
+cztl
+Ungrouped
+More
+Call subagent with Nvidia model
+Creator mode
+Chat
+Trajectory
+Call the subagent tool exactly once with provider "nvidia", model "nvidia/nemotron-3-ultra-550b-a55b", and prompt "hi". Quote the exact error returned.
+06:12
+Failed
+Create subagent
+Error: Subagent pool: nvidia/nvidia/nemotron-3-ultra-550b-a55b is not a configured route; use arc/qwen3.8-27b-k4_xl-thinking, bonzai-rtx/rtx-bonzi.
+Deep diving
+Deep diving for 14s ···
+Message or run a task, / commands, @ files or sessions
+Full access
+Qwen3.8-27B-Q4_K_M-Thinking
+Default
+1 turns 1 steps·26 tok/s
+10.5K tok·Cache hit 89%
+16%

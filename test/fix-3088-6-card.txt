@@ -1,0 +1,78 @@
+Subagent Pool
+ACTIVE
+Running: 0 / 5
+ROUTES
+arc/qwen3.8-27b-k4_xl-thinking
+cap 0 · running 0 · idle 0
+deep
+max-thinking: high
+good for: deep reasoning
+avoid: trivial tasks
+notes: disabled for test
+bonzai-rtx/rtx-bonzi
+cap 1 · running 0 · idle 0
+deep
+max-thinking: medium
+good for: quick tasks
+avoid: deep reasoning
+notes: —
+Queue: 0 waiting (max len 20, wait 300 s)
+Queue empty
+CONFIGURE
+Enabled
+Total cap
+×
+max thinking
+no thinking cap
+off — Off
+minimal — Minimal
+low — Low
+medium — Medium
+high — High
+xhigh — Xhigh
+max — Max
+thinking: —
+off
+minimal
+low
+medium
+high
+xhigh
+max
+speed: —
+fast
+medium
+slow
+instructions: —
+high-level ok
+explicit
+step-by-step
+×
+max thinking
+no thinking cap
+off — Off
+minimal — Minimal
+low — Low
+medium — Medium
+high — High
+xhigh — Xhigh
+max — Max
+thinking: —
+off
+minimal
+low
+medium
+high
+xhigh
+max
+speed: —
+fast
+medium
+slow
+instructions: —
+high-level ok
+explicit
+step-by-step
++ Add route
+Save
+invalid config: duplicate route arc/qwen3.8-27b-k4_xl-thinking

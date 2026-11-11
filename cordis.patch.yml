@@ -8,6 +8,6 @@
     - id: subagent-pool
       name: 'dsh-subagent-pool'
       config:
-        enabled: false
-        totalCap: 0
+        enabled: true
+        totalCap: 2
         routes: []

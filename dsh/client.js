@@ -11,19 +11,69 @@ window.__ModuleLoader__.load(
       var KEY = "subagent-pool";
       var ROUTE = "/subagent-pool";
 
+      // Theme tokens: use the Web GUI's own --dsw-* variables so the card
+      // follows light/dark mode and matches the other settings pages exactly.
       var T = {
-        bg: 'var(--dsh-bg)',
-        card: 'var(--dsh-card)',
-        border: 'var(--dsh-border)',
-        text: 'var(--dsh-text)',
-        muted: 'var(--dsh-muted)',
-        err: 'var(--dsh-error)',
-        ok: 'var(--dsh-success)',
-        warn: 'var(--dsh-warning)',
-        primary: 'var(--dsh-primary)',
-        field: 'var(--dsh-field)',
-        input: 'var(--dsh-input)'
+        bg: 'var(--dsw-alias-bg-base)',
+        card: 'var(--dsw-alias-settings-card-fill)',
+        border: 'var(--dsw-alias-border-l2)',
+        borderStrong: 'var(--dsw-alias-border-l4)',
+        text: 'var(--dsw-alias-label-primary)',
+        muted: 'var(--dsw-alias-label-secondary)',
+        err: 'var(--dsw-alias-state-error-primary)',
+        ok: 'var(--dsw-alias-state-success-primary)',
+        warn: 'var(--dsw-alias-state-warning-primary, var(--dsw-alias-state-business-primary))',
+        primary: 'var(--dsw-alias-button-primary-fill)',
+        primaryFg: 'var(--dsw-alias-label-primary-foreground)',
+        field: 'var(--dsw-alias-bg-layer-1)',
+        input: 'var(--dsw-alias-bg-layer-3)',
+        hover: 'var(--dsw-alias-interactive-bg-hover)',
+        brand: 'var(--dsw-alias-brand-primary)',
+        accent: 'var(--dsw-alias-state-business-primary)',
+        switchOff: 'var(--dsw-alias-border-l3)',
+        thumbOff: 'var(--dsw-alias-switch-thumb)',
+        thumbOn: 'var(--dsw-alias-label-primary-foreground)'
       };
+
+      // One-shot <style> injection: classes mirror the app's own components
+      // (._input_181ew_115 field spec, ._switch_1ik0f_5 switch spec, icon
+      // buttons, settings cards) so hover/focus/disabled states behave like
+      // the rest of the GUI.
+      var CSS_ID = 'dsh-subagent-pool-style';
+      function ensureCss() {
+        if (typeof document === 'undefined' || document.getElementById(CSS_ID)) return;
+        var st = document.createElement('style');
+        st.id = CSS_ID;
+        st.textContent = [
+          '.dsp-input,.dsp-select{box-sizing:border-box;width:100%;height:34px;padding:0 12px;',
+          'border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);',
+          'background:var(--dsw-alias-bg-layer-3);font:inherit;font-size:13px;line-height:1.5;',
+          'color:var(--dsw-alias-label-primary)}',
+          '.dsp-input:focus-visible,.dsp-select:focus-visible{outline:none;border-color:var(--dsw-alias-state-business-primary)}',
+          '.dsp-input:disabled,.dsp-select:disabled{opacity:.5;cursor:default}',
+          '.dsp-input::placeholder{color:var(--dsw-alias-label-secondary);opacity:.6}',
+          '.dsp-selwrap{position:relative;display:block;width:100%}',
+          '.dsp-select{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:28px;',
+          'text-overflow:ellipsis;white-space:nowrap;overflow:hidden}',
+          '.dsp-selchev{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--dsw-alias-label-secondary)}',
+          '.dsp-btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:4px;',
+          'height:34px;padding:0 14px;border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;cursor:pointer;border:.5px solid transparent}',
+          '.dsp-btn:disabled{opacity:.5;cursor:default}',
+          '.dsp-btn-primary{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:none}',
+          '.dsp-btn-primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}',
+          '.dsp-btn-ghost{background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l3)}',
+          '.dsp-btn-ghost:hover:not(:disabled){background:var(--dsw-alias-button-ghost-active-hover)}',
+          '.dsp-iconbtn{width:28px;height:28px;flex:0 0 auto;border:none;border-radius:8px;background:transparent;',
+          'color:var(--dsw-alias-label-secondary);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;padding:0}',
+          '.dsp-iconbtn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+          '.dsp-iconbtn:disabled{opacity:.5;cursor:default}',
+          '.dsp-card{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-settings-card-fill);padding:12px}',
+          '.dsp-chip{display:inline-block;background:var(--dsw-alias-interactive-bg-hover);border-radius:6px;padding:1px 6px;font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+          '.dsp-label{font-size:11px;color:var(--dsw-alias-label-secondary)}',
+          '.dsp-h{font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:bold;color:var(--dsw-alias-label-secondary)}'
+        ].join('');
+        (document.head || document.documentElement).appendChild(st);
+      }
 
       var DEFAULT_ROUTES = [
         { provider: 'qwen_local', model: 'qwen38_27b_medium', cap: 1, tier: 'deep' },
@@ -156,22 +206,45 @@ window.__ModuleLoader__.load(
             else { updateRoute(i, { cap: lastCapRef.current[i] || 1 }); }
           }
 
+          // Exact replica of the GUI's own switch (._switch_1ik0f_5):
+          // 36x20 track, 2px inset, 16px thumb, translate(16px) when on.
           function Switch(props) {
             return React.createElement('button', {
               type: 'button', role: 'switch', 'aria-checked': props.on ? 'true' : 'false',
-              title: props.on ? 'Route enabled — click to disable (cap 0)' : 'Route disabled — click to enable',
+              'aria-label': props.label || 'Toggle',
+              title: props.title || (props.on ? 'Enabled — click to disable' : 'Disabled — click to enable'),
+              disabled: !!props.disabled,
               onClick: props.onClick,
               style: {
-                width: 34, height: 18, borderRadius: 9, padding: 0, flexShrink: 0,
-                border: '1px solid ' + T.border, background: props.on ? T.ok : T.input,
-                position: 'relative', cursor: 'pointer'
+                boxSizing: 'border-box', position: 'relative', flex: '0 0 auto',
+                width: 36, height: 20, padding: 2, border: 0, borderRadius: 999,
+                background: props.on ? T.brand : T.switchOff,
+                cursor: props.disabled ? 'default' : 'pointer',
+                opacity: props.disabled ? 0.5 : 1
               }
             }, React.createElement('span', {
               style: {
-                position: 'absolute', top: 1, left: props.on ? 17 : 1,
-                width: 14, height: 14, borderRadius: '50%', background: '#fff'
+                display: 'block', width: 16, height: 16, borderRadius: '50%',
+                background: props.on ? T.thumbOn : T.thumbOff,
+                transform: props.on ? 'translate(16px)' : 'none',
+                transition: 'transform .12s ease'
               }
             }));
+          }
+
+          // Native <select> wrapped in the app's field styling + chevron.
+          function Sel(props) {
+            return React.createElement('span', { className: 'dsp-selwrap', style: props.wrapStyle || null },
+              React.createElement('select', {
+                className: 'dsp-select',
+                style: props.style || null,
+                disabled: props.disabled,
+                value: props.value,
+                title: props.title,
+                onChange: props.onChange
+              }, props.children),
+              React.createElement('span', { className: 'dsp-selchev', 'aria-hidden': true }, '▾')
+            );
           }
 
           function removeRoute(i) {
@@ -320,6 +393,17 @@ window.__ModuleLoader__.load(
 
           var useSelects = (catalogVal && catalogVal.ok === true);
 
+          // Gate every action until the config has actually loaded (status
+          // poll answered or the host form is ready) — no edits against a
+          // blank form.
+          var formReady = !!(formRef.current && formRef.current.state && formRef.current.state.status === 'ready' && formRef.current.state.value);
+          var loaded = !!statusVal || formReady;
+          ensureCss();
+          if (!loaded) {
+            return React.createElement('div', { style: { maxWidth: 720, padding: 16, fontSize: 13, color: T.muted, fontFamily: 'inherit' } },
+              'Loading configuration…');
+          }
+
           function providerOptions(c, current) {
             if (!c || c.ok !== true || !Array.isArray(c.providers)) return [''];
             var ids = c.providers.map(function (p) { return p.id; });
@@ -342,33 +426,10 @@ window.__ModuleLoader__.load(
           }
 
           var smallMuted = { fontSize: 11, color: T.muted };
-          var inputStyle = {
-            background: T.input,
-            border: '1px solid ' + T.border,
-            borderRadius: 4,
-            padding: '5px 8px',
-            fontSize: 13,
-            color: T.text,
-            fontFamily: 'inherit',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden'
-          };
-          var selectStyle = Object.assign({}, inputStyle, { appearance: 'none', cursor: 'pointer', paddingRight: 18 });
-          var btnStyle = {
-            background: T.primary,
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            padding: '6px 12px',
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit'
-          };
           var badgeStyle = {
             display: 'inline-block',
-            borderRadius: 3,
-            padding: '1px 5px',
+            borderRadius: 6,
+            padding: '2px 8px',
             fontSize: 11,
             fontWeight: 'bold'
           };
@@ -377,7 +438,7 @@ window.__ModuleLoader__.load(
           if (statusVal) {
             var badgeLabel = statusVal.enabled ? 'ACTIVE' : 'INACTIVE';
             var badgeColor = statusVal.enabled ? T.ok : T.err;
-            statusBadge = React.createElement('span', { key: 'badge', style: Object.assign({}, badgeStyle, { color: '#fff', background: badgeColor }) }, badgeLabel);
+            statusBadge = React.createElement('span', { key: 'badge', style: Object.assign({}, badgeStyle, { color: T.primaryFg, background: badgeColor }) }, badgeLabel);
           }
 
           var card = [];
@@ -398,23 +459,23 @@ window.__ModuleLoader__.load(
             }
           }
 
-          var chipStyle = { background: T.border, borderRadius: 3, padding: '1px 6px', fontSize: 11, color: T.muted, whiteSpace: 'nowrap' };
+          var chipStyle = 'dsp-chip';
           if (statusVal && Array.isArray(statusVal.routes) && statusVal.routes.length > 0) {
-            card.push(React.createElement('div', { key: 'routes-h', style: Object.assign({}, smallMuted, { marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Routes'));
+            card.push(React.createElement('div', { key: 'routes-h', className: 'dsp-h', style: { marginTop: 12 } }, 'Routes'));
             for (var ri = 0; ri < statusVal.routes.length; ri++) {
               var sr = statusVal.routes[ri];
               var sp = (sr && sr.profile && typeof sr.profile === 'object') ? sr.profile : {};
-              card.push(React.createElement('div', { key: 'sr-' + ri, style: { display: 'flex', flexDirection: 'column', gap: 6, background: T.field, border: '1px solid ' + T.border, borderRadius: 8, padding: '8px 10px', marginTop: 6 } },
+              card.push(React.createElement('div', { key: 'sr-' + ri, className: 'dsp-card', style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 } },
                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
                   React.createElement('span', { style: { fontWeight: 'bold', color: T.text, fontSize: 12, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' } }, (sr.provider || '') + '/' + (sr.model || '')),
-                  React.createElement('span', { key: 'stats', style: chipStyle }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + ' · running ' + (sr.running || 0) + ' · idle ' + (sr.idle || 0)),
-                  (sr.tier ? React.createElement('span', { key: 'tier', style: chipStyle }, sr.tier) : null)
+                  React.createElement('span', { key: 'stats', className: chipStyle }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + ' · running ' + (sr.running || 0) + ' · idle ' + (sr.idle || 0)),
+                  (sr.tier ? React.createElement('span', { key: 'tier', className: chipStyle }, sr.tier) : null)
                 ),
                 React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
-                  React.createElement('span', { key: 'mt', style: chipStyle }, 'max-thinking: ' + (sr.maxThinking || 'none')),
-                  React.createElement('span', { key: 'best', style: chipStyle }, 'good for: ' + (sp.bestFor || '—')),
-                  React.createElement('span', { key: 'avoid', style: chipStyle }, 'avoid: ' + (sp.avoidFor || '—')),
-                  React.createElement('span', { key: 'notes', style: chipStyle }, 'notes: ' + (sp.notes || '—'))
+                  React.createElement('span', { key: 'mt', className: chipStyle }, 'max-thinking: ' + (sr.maxThinking || 'none')),
+                  React.createElement('span', { key: 'best', className: chipStyle }, 'good for: ' + (sp.bestFor || '—')),
+                  React.createElement('span', { key: 'avoid', className: chipStyle }, 'avoid: ' + (sp.avoidFor || '—')),
+                  React.createElement('span', { key: 'notes', className: chipStyle }, 'notes: ' + (sp.notes || '—'))
                 )
               ));
             }
@@ -422,7 +483,7 @@ window.__ModuleLoader__.load(
 
           if (statusVal && statusVal.queue) {
             var q = statusVal.queue;
-            card.push(React.createElement('div', { key: 'queue', style: { marginTop: 8, background: T.field, border: '1px solid ' + T.border, borderRadius: 6, padding: 8 } },
+            card.push(React.createElement('div', { key: 'queue', className: 'dsp-card', style: { marginTop: 8, padding: 8 } },
               React.createElement('div', { style: { fontSize: 12, color: T.text, fontWeight: 'bold' } },
                 'Queue: ' + (q.total || 0) + ' waiting (max len ' + (q.maxLen || 20) + ', wait ' + (q.maxWaitSec || 300) + ' s)'),
               (q.waiting && q.waiting.length > 0) ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 } },
@@ -431,21 +492,22 @@ window.__ModuleLoader__.load(
                   var waitingSec = (w && w.waitingSec) || 0;
                   return React.createElement('div', { key: 'q-' + idx, style: { display: 'flex', gap: 6, fontSize: 11, color: T.muted, alignItems: 'center' } },
                     React.createElement('span', { style: { fontWeight: 'bold' } }, routeLabel),
-                    React.createElement('span', { style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, waitingSec + 's')
+                    React.createElement('span', { className: 'dsp-chip' }, waitingSec + 's')
                   );
                 })
               ) : React.createElement('div', { style: { fontSize: 11, color: T.muted, marginTop: 4 } }, 'Queue empty')
             ));
           }
 
-          card.push(React.createElement('div', { key: 'form-h', style: Object.assign({}, smallMuted, { marginTop: 16, paddingTop: 12, borderTop: '1px solid ' + T.border, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Configure'));
+          card.push(React.createElement('div', { key: 'form-h', className: 'dsp-h', style: { marginTop: 16, paddingTop: 12, borderTop: '1px solid ' + T.border } }, 'Configure'));
           card.push(React.createElement('div', { key: 'form', style: { display: 'flex', flexDirection: 'column', gap: 10 } }));
           card.push(React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13, color: T.text } },
-            React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
-              React.createElement('input', {
-                type: 'checkbox',
-                checked: formVal.enabled,
-                onChange: function (e) { patchForm({ enabled: e.target.checked !== false }); }
+            React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' } },
+              React.createElement(Switch, {
+                on: formVal.enabled === true,
+                label: 'Pool enabled',
+                title: formVal.enabled ? 'Pool enabled — click to disable' : 'Pool disabled — click to enable',
+                onClick: function () { patchForm({ enabled: formVal.enabled !== true }); }
               }),
               'Enabled'
             ),
@@ -455,7 +517,7 @@ window.__ModuleLoader__.load(
                 type: 'number',
                 min: 0,
                 value: formVal.totalCap,
-                style: Object.assign({}, inputStyle, { width: 56 }),
+                className: 'dsp-input', style: { width: 56 },
                 onChange: function (e) { patchForm({ totalCap: capNum(e.target.value) }); }
               })
             )
@@ -481,11 +543,10 @@ window.__ModuleLoader__.load(
               for (var vi = 0; vi < pvOpts.length; vi++) {
                 pvOptsArr.push(React.createElement('option', { key: pvOpts[vi], value: pvOpts[vi] }, pvOpts[vi]));
               }
-              var pvSel = React.createElement('select', {
+              var pvSel = React.createElement(Sel, {
                 key: 'pv',
                 value: r.provider,
                 title: r.provider || 'provider',
-                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, model: '', maxThinking: '' }); }
               }, pvOptsArr);
               line1.push(pvSel);
@@ -496,11 +557,10 @@ window.__ModuleLoader__.load(
               for (var mi = 0; mi < mo.length; mi++) {
                 moArr.push(React.createElement('option', { key: mo[mi], value: mo[mi] }, mo[mi]));
               }
-              var mdSel = React.createElement('select', {
+              var mdSel = React.createElement(Sel, {
                 key: 'md',
                 value: r.model,
                 title: r.model || 'model',
-                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }, moArr);
               line1.push(mdSel);
@@ -510,7 +570,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.provider,
                 placeholder: 'provider',
-                style: Object.assign({}, inputStyle, { width: '100%' }),
+                className: 'dsp-input',
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, maxThinking: '' }); }
               }));
               line1.push(React.createElement('input', {
@@ -518,7 +578,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.model,
                 placeholder: 'model',
-                style: Object.assign({}, inputStyle, { width: '100%' }),
+                className: 'dsp-input',
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }));
             }
@@ -527,14 +587,16 @@ window.__ModuleLoader__.load(
               type: 'number',
               min: 0,
               value: r.cap,
-              style: Object.assign({}, inputStyle, { width: '100%' }),
+              className: 'dsp-input',
               onChange: function (e) { updateRoute(i, { cap: capNum(e.target.value) }); }
             }));
             line1.push(React.createElement('button', {
               key: 'rm',
-              style: { background: 'none', border: 'none', color: T.err, cursor: 'pointer', fontSize: 14, padding: 0, width: 24, height: 24, borderRadius: 4 },
+              type: 'button',
+              className: 'dsp-iconbtn',
               onClick: function () { removeRoute(i); },
-              title: 'Remove route'
+              title: 'Remove route',
+              'aria-label': 'Remove route'
             }, '\u00D7'));
 
             var mtOpts = efforts.length > 0 ? efforts.map(function (e) { return e.id; }) : EFFORT_LADDER.slice();
@@ -548,10 +610,10 @@ window.__ModuleLoader__.load(
               if (eff && eff.name && eff.name !== mtOpts[ti]) mtLabel = mtOpts[ti] + ' \u2014 ' + eff.name;
               mtArr.push(React.createElement('option', { key: mtOpts[ti], value: mtOpts[ti] }, mtLabel));
             }
-            var mtSel = React.createElement('select', {
+            var mtSel = React.createElement(Sel, {
               key: 'mt',
               value: r.maxThinking,
-              style: Object.assign({}, selectStyle, { width: '100%' }),
+              title: 'max thinking',
               onChange: function (e) { updateRoute(i, { maxThinking: e.target.value }); }
             }, mtArr);
             var line2 = [mtSel];
@@ -561,10 +623,9 @@ window.__ModuleLoader__.load(
             for (var tki = 0; tki < THINKING_OPTS.length; tki++) {
               ptArr.push(React.createElement('option', { key: THINKING_OPTS[tki], value: THINKING_OPTS[tki] }, THINKING_OPTS[tki]));
             }
-            var ptSel = React.createElement('select', {
+            var ptSel = React.createElement(Sel, {
               key: 'pt',
               value: p.thinking,
-              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'thinking', e.target.value); }
             }, ptArr);
             var psArr = [];
@@ -572,10 +633,9 @@ window.__ModuleLoader__.load(
             for (var ski = 0; ski < SPEED_OPTS.length; ski++) {
               psArr.push(React.createElement('option', { key: SPEED_OPTS[ski], value: SPEED_OPTS[ski] }, SPEED_OPTS[ski]));
             }
-            var psSel = React.createElement('select', {
+            var psSel = React.createElement(Sel, {
               key: 'ps',
               value: p.speed,
-              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'speed', e.target.value); }
             }, psArr);
             var piArr = [];
@@ -583,10 +643,9 @@ window.__ModuleLoader__.load(
             for (var ipi = 0; ipi < INSTRUCTIONS_OPTS.length; ipi++) {
               piArr.push(React.createElement('option', { key: INSTRUCTIONS_OPTS[ipi], value: INSTRUCTIONS_OPTS[ipi] }, INSTRUCTIONS_OPTS[ipi]));
             }
-            var piSel = React.createElement('select', {
+            var piSel = React.createElement(Sel, {
               key: 'pi',
               value: p.instructions,
-              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'instructions', e.target.value); }
             }, piArr);
             var line3 = [ptSel, psSel, piSel];
@@ -597,7 +656,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: p.bestFor,
                 placeholder: 'good for…',
-                style: Object.assign({}, inputStyle, { width: '100%' }),
+                className: 'dsp-input',
                 onChange: function (e) { updateProfile(i, 'bestFor', e.target.value); }
               }),
               React.createElement('input', {
@@ -605,7 +664,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: p.avoidFor,
                 placeholder: 'avoid…',
-                style: Object.assign({}, inputStyle, { width: '100%' }),
+                className: 'dsp-input',
                 onChange: function (e) { updateProfile(i, 'avoidFor', e.target.value); }
               }),
               React.createElement('input', {
@@ -613,31 +672,37 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: p.notes,
                 placeholder: 'notes (optional)',
-                style: Object.assign({}, inputStyle, { width: '100%' }),
+                className: 'dsp-input',
                 onChange: function (e) { updateProfile(i, 'notes', e.target.value); }
               })
             ];
 
             var isOpen = openVal[i] === true;
             var capOn = Number(r.cap) > 0;
-            var sw = React.createElement(Switch, { on: capOn, onClick: function () { toggleRoute(i, Number(r.cap) || 0); } });
+            var sw = React.createElement(Switch, {
+              on: capOn,
+              label: (r.provider || 'route') + '/' + (r.model || '') + (capOn ? ' enabled' : ' disabled'),
+              title: capOn ? 'Route enabled — click to disable (cap 0)' : 'Route disabled — click to enable',
+              onClick: function () { toggleRoute(i, Number(r.cap) || 0); }
+            });
             var chev = React.createElement('button', {
-              type: 'button', title: isOpen ? 'Collapse details' : 'Expand details',
+              type: 'button',
+              className: 'dsp-iconbtn',
+              title: isOpen ? 'Collapse details' : 'Expand details',
               'aria-label': isOpen ? 'Collapse route details' : 'Expand route details',
-              onClick: function () { setOpenVal(function (o) { var n = Object.assign({}, o); n[i] = !isOpen; return n; }); },
-              style: { background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 14, width: 28, height: 24, padding: 0 }
+              onClick: function () { setOpenVal(function (o) { var n = Object.assign({}, o); n[i] = !isOpen; return n; }); }
             }, isOpen ? '\u25BE' : '\u25B8');
-            var capBox = React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 5 } },
-              React.createElement('span', { style: smallMuted }, 'cap'),
+            var capBox = React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+              React.createElement('span', { className: 'dsp-label' }, 'cap'),
               line1[2]
             );
-            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '34px minmax(0,0.85fr) minmax(0,1.6fr) 92px 28px 28px', gap: 8, alignItems: 'center' } },
+            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '36px minmax(0,0.85fr) minmax(0,1.6fr) 96px 28px 28px', gap: 10, alignItems: 'center' } },
               sw, line1[0], line1[1], capBox, chev, line1[3]
             )];
             if (isOpen) {
-              panel.push(React.createElement('div', { key: 'det', style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid ' + T.border, display: 'flex', flexDirection: 'column', gap: 8 } },
+              panel.push(React.createElement('div', { key: 'det', style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--dsw-alias-border-l1)', display: 'flex', flexDirection: 'column', gap: 8 } },
                 React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '110px 190px', gap: 8, alignItems: 'center' } },
-                  React.createElement('span', { style: smallMuted }, 'max thinking'),
+                  React.createElement('span', { className: 'dsp-label' }, 'max thinking'),
                   line2[0]
                 ),
                 React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
@@ -648,18 +713,18 @@ window.__ModuleLoader__.load(
                 )
               ));
             }
-            card.push(React.createElement('div', { key: 'fr-' + i, style: { border: '1px solid ' + T.border, borderRadius: 8, padding: 10, background: T.field, marginTop: 8 } }, panel));
+            card.push(React.createElement('div', { key: 'fr-' + i, className: 'dsp-card', style: { marginTop: 8 } }, panel));
           }
 
           card.push(React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' } },
             React.createElement('button', {
               key: 'add-route',
-              style: btnStyle,
+              className: 'dsp-btn dsp-btn-ghost',
               onClick: function () { addRoute(); }
             }, '+ Add route'),
             React.createElement('button', {
               key: 'save',
-              style: btnStyle,
+              className: 'dsp-btn dsp-btn-primary',
               disabled: busyVal,
               onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
             }, busyVal ? 'Saving…' : 'Save'),

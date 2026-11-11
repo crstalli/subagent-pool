@@ -1,0 +1,54 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+ai
+Running
+Test Subagent Tool Invocation
+1min
+Call the subagent tool exactly
+19min
+work on the chrome-eye skill..
+1h
+F:\ai\plugins\subagent-pool - can you do
+4h
+F:\ai\dsh-agent-swarm --- Readme.md. Cre
+5h
+Show 38 more sessions
+cztl
+Ungrouped
+More
+Test Subagent Tool Invocation
+Creator mode
+Chat
+Trajectory
+Call the subagent tool exactly once with provider "arc", model "qwen3.8-27b-k4_xl-thinking", and prompt "Reply with exactly: PONG-POOL-OK". Then tell me what the subagent returned.
+02:32
+Failed
+Create subagent
+Error: child LLM route "arc/qwen3.8-27b-k4_xl-thinking" is not allowed for this Session
+
+The subagent call was rejected by the harness. Here is the exact result:
+
+Error: child LLM route "arc/qwen3.8-27b-k4_xl-thinking" is not allowed for this Session
+
+The arc provider / qwen3.8-27b-k4_xl-thinking model route isn't permitted for this session, so the subagent never actually started and no "PONG-POOL-OK" reply was produced.
+
+A few things I can do next if you'd like:
+
+Check which provider/model routes are currently allowed in this session (via the list_subagent_models tool) so we can pick one that works.
+Try a different provider/model if you have a specific target in mind.
+Investigate why that route is blocked (e.g.,
+Deep diving
+Deep diving for 1m 25s ···
+
+Now call the subagent tool once with provider "nvidia", model "nvidia/nemotron-3-ultra-550b-a55b", prompt "hi". Report the exact error.
+
+Full access
+Qwen3.8-27B-Q4_K_M-Thinking
+Default
+1 turns 1 steps·27 tok/s
+10.5K tok·Cache hit 0%
+16%

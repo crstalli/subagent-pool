@@ -1,0 +1,29 @@
+New Session
+Plugins
+Automation tasks
+More
+Workspaces
+f
+ai
+New Session
+Running
+work on the chrome-eye skill..
+5min
+Running
+F:\ai\plugins\subagent-pool - can you do
+21min
+Running
+F:\ai\dsh-agent-swarm --- Readme.md. Cre
+1h
+work on the chrome-eye skill..
+1h
+github:crstalli/subagent-pool Okay... Go
+1h
+Show 36 more sessions
+cztl
+Ungrouped
+More
+Plugins
+Install, enable, and configure plugins
+Refresh
+Add plugin
