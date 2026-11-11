@@ -3,9 +3,46 @@
 // Ported from pool-host-v4.js dynamic plugin.
 
 import { resolve as pathResolve } from 'node:path';
+import Schema from '@deepseek-ai/schemastery';
 
 export const name = 'subagent-pool';
 export const inject = ['webServer'];
+
+// Declared Config schema: this makes the `subagent-pool` loader entry a
+// *configurable plugin entry* (docs/user/develop/basic/config.md). The entry
+// then (a) accepts config from cordis.yml, (b) is editable through the
+// Settings GUI / `settings.update('subagent-pool', patch)`, and (c) shows up
+// in the plugin manager's configure views. All top-level fields are volatile,
+// so settings.update() applies them live without a plugin reload; the pool
+// reads them via .get() (see readLive below). subagent_pool_config.json stays
+// as a persistence mirror written by the /configure endpoint and imported at
+// boot when present.
+const RouteProfileSchema = Schema.object({
+  thinking: Schema.string().default(''),
+  speed: Schema.string().default(''),
+  instructions: Schema.string().default(''),
+  bestFor: Schema.string().default(''),
+  avoidFor: Schema.string().default(''),
+  notes: Schema.string().default('')
+}).default({});
+const RouteSchema = Schema.object({
+  provider: Schema.string().min(1).required(),
+  model: Schema.string().min(1).required(),
+  cap: Schema.natural().default(1),
+  tier: Schema.string().default(''),
+  maxThinking: Schema.string().default(''),
+  profile: RouteProfileSchema
+});
+// Schema is deliberately permissive at load time (the shipped cordis.patch.yml
+// row uses enabled:false / totalCap:0 as the off state); runtime semantics
+// (totalCap >= 1, non-empty routes) stay enforced by validateConfig().
+export const Config = Schema.object({
+  enabled: Schema.boolean().default(true).volatile(),
+  totalCap: Schema.natural().default(2).volatile(),
+  queueMaxWaitSec: Schema.number().min(0).default(300).volatile(),
+  queueMaxLen: Schema.natural().default(20).volatile(),
+  routes: Schema.array(RouteSchema).default([]).volatile()
+});
 
 export function apply(ctx, config) {
   // ---- log helper ----
@@ -15,7 +52,11 @@ export function apply(ctx, config) {
   // In ESM, use import.meta.url to resolve __dirname equivalent
   const __dirname = pathResolve(new URL('.', import.meta.url).pathname);
   const CONFIG_PATH = pathResolve(__dirname, 'subagent_pool_config.json');
-  const NS_SELECTION = 'subagent-model-selection';
+  // Registered by @deepseek-ai/dsh-tool-subagent (model-selection-settings.js
+  // exports name = 'subagent-model-selection-settings'); settings.update() takes
+  // the profile entry id, so this must match exactly or every write throws
+  // "No configurable plugin entry".
+  const NS_SELECTION = 'subagent-model-selection-settings';
   const NS_DEFAULT = 'agent-default-model';
 
   // Canonical thinking-effort ladder
@@ -31,18 +72,68 @@ export function apply(ctx, config) {
   let reason = 'starting';
   const tracked = new Map();
 
+  // Live Config-entry handle (exported `Config` above). Volatile fields arrive
+  // as Volatile handles with .get(); plain values are used as-is. `cs()` is the
+  // single read path for pool state so edits made through the Settings GUI /
+  // settings.update('subagent-pool', …) take effect without a plugin reload.
+  let liveCfg = config; // live Config-entry handles (declared `Config` schema above)
+  function field(f, dflt) {
+    const v = liveCfg ? liveCfg[f] : undefined;
+    if (v === undefined || v === null) return dflt;
+    return (typeof v.get === 'function') ? v.get() : v;
+  }
+  function readLive() {
+    if (!liveCfg) return null;
+    const cfg = {
+      version: 3,
+      enabled: field('enabled', true) === true,
+      totalCap: field('totalCap', 2),
+      queueMaxWaitSec: field('queueMaxWaitSec', 300),
+      queueMaxLen: field('queueMaxLen', 20),
+      routes: field('routes', [])
+    };
+    if (validateConfig(cfg)) return null; // invalid live value: keep last good
+    return cfg;
+  }
+  // Adopt a (validated) config as the running state.
+  function adopt(cfg, opts) {
+    configState = cfg;
+    enabled = (cfg.enabled === true);
+    reason = enabled ? '' : 'disabled by configure';
+    if (!opts || opts.namespace !== false) {
+      if (enabled) applyNamespace(); else restoreNamespace();
+    }
+    processQueue();
+  }
+  // Set once the settings entry has been synced with our persisted JSON at
+  // boot (or the entry is authoritative because no JSON existed); before that,
+  // cs() must not adopt entry defaults over the just-loaded JSON.
+  let entrySynced = false;
+  // Read path used everywhere below: syncs from the live entry when it changed
+  // (e.g. an edit made in the Settings GUI), then returns the running state.
+  function cs() {
+    if (entrySynced) {
+      const live = readLive();
+      if (live && JSON.stringify(live) !== JSON.stringify(configState)) {
+        adopt(live, { namespace: true });
+        writeConfig(live).catch(function () {}); // keep the JSON mirror in sync
+      }
+    }
+    return configState;
+  }
+
   // ---- queue state (in-memory only) ----
   let queue = [];
   let nextQid = 1;
 
   function queueMaxWaitMs() {
-    if (configState && typeof configState.queueMaxWaitSec === 'number' && configState.queueMaxWaitSec >= 1)
-      return configState.queueMaxWaitSec * 1000;
+    if (cs() && typeof cs().queueMaxWaitSec === 'number' && cs().queueMaxWaitSec >= 1)
+      return cs().queueMaxWaitSec * 1000;
     return 300 * 1000;
   }
   function queueMaxLen() {
-    if (configState && Number.isInteger(configState.queueMaxLen) && configState.queueMaxLen >= 1)
-      return configState.queueMaxLen;
+    if (cs() && Number.isInteger(cs().queueMaxLen) && cs().queueMaxLen >= 1)
+      return cs().queueMaxLen;
     return 20;
   }
 
@@ -186,16 +277,16 @@ export function apply(ctx, config) {
 
   // ---- guard helpers ----
   function findRoute(route) {
-    if (!configState || !Array.isArray(configState.routes)) return undefined;
-    for (let i = 0; i < configState.routes.length; i++) {
-      const r = configState.routes[i];
+    if (!cs() || !Array.isArray(cs().routes)) return undefined;
+    for (let i = 0; i < cs().routes.length; i++) {
+      const r = cs().routes[i];
       if (r.provider === route.provider && r.model === route.model) return r;
     }
     return undefined;
   }
   function listRoutes() {
-    if (!configState || !Array.isArray(configState.routes)) return 'none';
-    return configState.routes.map(function (r) { return r.provider + '/' + r.model; }).join(', ');
+    if (!cs() || !Array.isArray(cs().routes)) return 'none';
+    return cs().routes.map(function (r) { return r.provider + '/' + r.model; }).join(', ');
   }
   function requestedRoute(args) {
     const a = (args && typeof args === 'object') ? args : {};
@@ -240,7 +331,7 @@ export function apply(ctx, config) {
   }
 
   function processQueue() {
-    if (!enabled || !configState || queue.length === 0) return;
+    if (!enabled || !cs() || queue.length === 0) return;
     const c = counts();
     let totalRunning = c.totalRunning;
     const admitted = {};
@@ -255,7 +346,7 @@ export function apply(ctx, config) {
         continue;
       }
       if (e.totalOnly) {
-        if (totalRunning + admittedTotal < configState.totalCap) {
+        if (totalRunning + admittedTotal < cs().totalCap) {
           log('pool: queue admit total (waited ' + Math.round((Date.now() - e.since) / 1000) + 's)');
           settleEntry(e, null);
           i--;
@@ -263,7 +354,7 @@ export function apply(ctx, config) {
         continue;
       }
       const rk = (c.byRoute[e.key] ? c.byRoute[e.key].running : 0) + (admitted[e.key] || 0);
-      if (rk >= rcfg.cap || totalRunning + admittedTotal >= configState.totalCap) continue;
+      if (rk >= rcfg.cap || totalRunning + admittedTotal >= cs().totalCap) continue;
       admitted[e.key] = (admitted[e.key] || 0) + 1;
       admittedTotal++;
       log('pool: queue admit ' + e.key + ' (waited ' + Math.round((Date.now() - e.since) / 1000) + 's)');
@@ -320,7 +411,7 @@ export function apply(ctx, config) {
 
   // Async guard for the waterfall
   function guardAsync(exec) {
-    if (!enabled || !configState) return Promise.resolve(null);
+    if (!enabled || !cs()) return Promise.resolve(null);
     const name = exec && exec.name;
     if (name === 'subagent' || name === 'subagent_fork') {
       const route = requestedRoute(exec && exec.arguments);
@@ -334,12 +425,12 @@ export function apply(ctx, config) {
       const c = counts();
       const rc = c.byRoute[key] ? c.byRoute[key].running : 0;
       if (rcfg.cap <= 0) return Promise.resolve({ kind: 'deny', reason: 'Subagent pool: route ' + route.provider + '/' + route.model + ' has cap 0 (disabled).' });
-      if (rc < rcfg.cap && c.totalRunning < configState.totalCap) return Promise.resolve(null);
+      if (rc < rcfg.cap && c.totalRunning < cs().totalCap) return Promise.resolve(null);
       return waitInQueue(route, key, exec && exec.signal, false);
     }
     if (name === 'workflow' || name === 'ralph') {
       const c = counts();
-      if (c.totalRunning < configState.totalCap) return Promise.resolve(null);
+      if (c.totalRunning < cs().totalCap) return Promise.resolve(null);
       return waitInQueue(defaultRoute(), 'total', exec && exec.signal, true);
     }
     return Promise.resolve(null);
@@ -372,10 +463,10 @@ export function apply(ctx, config) {
   function statusPayload() {
     const c = counts();
     const out = { enabled: enabled };
-    if (configState && Array.isArray(configState.routes)) {
-      out.totalCap = configState.totalCap;
+    if (cs() && Array.isArray(cs().routes)) {
+      out.totalCap = cs().totalCap;
       out.totalRunning = c.totalRunning;
-      out.routes = configState.routes.map(routeView);
+      out.routes = cs().routes.map(routeView);
       out.queue = {
         total: queue.length,
         maxLen: queueMaxLen(),
@@ -403,12 +494,19 @@ export function apply(ctx, config) {
       if (settings) { const desc = settings.describe().find(r => r.ns === NS_SELECTION); if (desc) { prevSelection = desc.value; hasPrev = !!prevSelection; } }
     } catch (e) {}
   }
-  function applyNamespace() {
-    if (!settings || !configState) return Promise.resolve();
+  function applyNamespace(retry) {
+    if (!settings || !cs()) return Promise.resolve();
     if (!nsActivated) savePrevSelection();
     nsActivated = true;
-    const allowedModels = configState.routes.map(function (r) { return { provider: r.provider, model: r.model }; });
-    return settings.update(NS_SELECTION, { enabled: true, allowedModels: allowedModels }).catch(function (e) { log('pool: namespace update failed: ' + e); });
+    const allowedModels = cs().routes.map(function (r) { return { provider: r.provider, model: r.model }; });
+    return settings.update(NS_SELECTION, { enabled: true, allowedModels: allowedModels }).then(function () {
+      log('pool: namespace applied (' + NS_SELECTION + ', ' + allowedModels.length + ' routes)');
+    }).catch(function (e) {
+      log('pool: namespace update failed: ' + e);
+      // The owning entry may not be registered yet when the pool activates;
+      // retry briefly instead of silently dropping the steering.
+      if ((retry || 0) < 10) setTimeout(function () { applyNamespace((retry || 0) + 1); }, 3000);
+    });
   }
   function restoreNamespace() {
     if (!settings || !nsActivated) return Promise.resolve();
@@ -420,15 +518,46 @@ export function apply(ctx, config) {
   }
 
   // ---- boot ----
+  // Push the persisted JSON into the now-configurable `subagent-pool` entry so
+  // the Settings GUI / cordis.yml view shows the live pool config (one-time
+  // migration for installs that predate the Config schema).
+  function pushEntry(cfg, retry) {
+    if (!settings) return Promise.resolve(false);
+    const patch = {
+      enabled: cfg.enabled === true,
+      totalCap: cfg.totalCap,
+      queueMaxWaitSec: cfg.queueMaxWaitSec,
+      queueMaxLen: cfg.queueMaxLen,
+      routes: cfg.routes
+    };
+    return settings.update(name, patch).then(function () {
+      log('pool: settings entry applied (subagent-pool)');
+      return true;
+    }).catch(function (e) {
+      log('pool: settings entry update failed: ' + e);
+      if ((retry || 0) < 10) return new Promise(function (res) {
+        setTimeout(function () { res(pushEntry(cfg, (retry || 0) + 1)); }, 3000);
+      });
+      return false;
+    });
+  }
   function boot() {
     return loadConfig().then(function (res) {
-      configState = res.config;
-      enabled = res.enabled;
-      reason = res.reason;
-      log('pool: ' + (enabled ? 'active' : 'inactive') + (reason ? ' (' + reason + ')' : ''));
-      if (enabled) applyNamespace();
-      processQueue();
-      return null;
+      const finish = function () {
+        // Entry is authoritative from here on; cs() picks up GUI edits live.
+        entrySynced = true;
+        const live = readLive();
+        if (live) { adopt(live, { namespace: false }); } else { configState = res.config; enabled = res.enabled; reason = res.reason; }
+        log('pool: ' + (enabled ? 'active' : 'inactive') + (reason ? ' (' + reason + ')' : ''));
+        if (enabled) applyNamespace(); else restoreNamespace();
+        processQueue();
+        return null;
+      };
+      if (res.config) {
+        // JSON exists: migrate it into the settings entry, then read live.
+        return pushEntry(res.config, 0).then(finish);
+      }
+      return finish();
     });
   }
 
@@ -457,11 +586,11 @@ export function apply(ctx, config) {
         name: 'subagent-pool',
         order: 1000,
         text: function () {
-          if (!enabled || !configState) return '';
+          if (!enabled || !cs()) return '';
           const lines = [];
-          lines.push('Subagent pool active: max ' + configState.totalCap + ' concurrent. Routes (pick the one that fits the task):');
-          for (let i = 0; i < configState.routes.length; i++) {
-            const r = configState.routes[i];
+          lines.push('Subagent pool active: max ' + cs().totalCap + ' concurrent. Routes (pick the one that fits the task):');
+          for (let i = 0; i < cs().routes.length; i++) {
+            const r = cs().routes[i];
             const p = r.profile || {};
             const cap = (typeof r.maxThinking === 'string' && r.maxThinking !== '') ? 'max thinking ' + r.maxThinking : 'no thinking cap';
             const desc = [];
@@ -628,7 +757,7 @@ export function apply(ctx, config) {
         if (configB64) {
           try { r = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8')); } catch (e) {}
         }
-        const base = configState || { version: 1, enabled: false, totalCap: 1, routes: [] };
+        const base = cs() || { version: 1, enabled: false, totalCap: 1, routes: [] };
         const next = {
           version: 3,
           enabled: r.enabled !== undefined ? (r.enabled === true) : (base ? base.enabled === true : true),
@@ -640,12 +769,21 @@ export function apply(ctx, config) {
         const verr = validateConfig(next);
         if (verr) { send(res, 200, { ok: false, error: 'invalid config: ' + verr }); return; }
         try {
-          await writeConfig(next);
-          configState = next;
-          enabled = (next.enabled === true);
-          reason = enabled ? '' : 'disabled by configure';
-          if (enabled) { applyNamespace(); processQueue(); }
-          else { restoreNamespace(); flushQueue('disabled while request was waiting in the queue.'); }
+          await writeConfig(next); // JSON mirror (persistence / back-compat)
+          entrySynced = true;
+          // Standard mechanism: write the plugin's own configurable entry so the
+          // Settings GUI and cordis.yml view stay in sync (volatile = live).
+          if (settings) {
+            await settings.update(name, {
+              enabled: next.enabled === true,
+              totalCap: next.totalCap,
+              queueMaxWaitSec: next.queueMaxWaitSec,
+              queueMaxLen: next.queueMaxLen,
+              routes: next.routes
+            }).catch(function (e) { log('pool: settings entry update failed: ' + e); });
+          }
+          adopt(next, { namespace: true });
+          if (!enabled) flushQueue('disabled while request was waiting in the queue.');
           send(res, 200, { ok: true, status: statusPayload() });
         } catch (e) {
           send(res, 200, { ok: false, error: 'write failed: ' + (e && e.message ? e.message : String(e)) });
@@ -690,34 +828,12 @@ export function apply(ctx, config) {
     }
   });
 
-  // ---- register a dedicated settings namespace for the browser card pairing ----
-  // The client card is keyed to `subagent-pool`; describe() lists this
-  // namespace as served, so ConfigurablePluginsTabController dispatches the
-  // pool card into the Settings "Plugins" tab. We do NOT reuse
-  // `subagent-model-selection` (NS_SELECTION) — DSH's SubagentModelSelectionConfig
-  // already registers it, so a second registration would throw on boot.
-  // describe() needs schema.toJSON(); resolve() invokes the schema as a
-  // function, so a plain callable stub satisfies both without an import.
-  const NS_POOL = 'subagent-pool';
-  const poolSchema = function (value) { return value; };
-  poolSchema.toJSON = function () {
-    return { type: 'object', additionalProperties: true };
-  };
-
-  ctx.inject(['settings'], (settingsScope) => {
-    if (settingsScope.settings) {
-      try {
-        settingsScope.settings.update(NS_POOL, {
-          enabled: false,
-          totalCap: 0,
-          routes: []
-        }).catch(function (e) { log('pool: settings update failed: ' + e); });
-        log('pool: settings section installed');
-      } catch (e) {
-        log('pool: settings installSection failed: ' + e);
-      }
-    }
-  });
+  // NOTE: this plugin now declares `export const Config` above, which makes its
+  // loader entry (`subagent-pool`) a configurable plugin entry. The pool writes
+  // it via settings.update('subagent-pool', …) on boot (migrating the persisted
+  // subagent_pool_config.json) and on every /configure save; subagent_pool_config.json
+  // remains as the on-disk mirror. Reads go through cs(), which picks up live
+  // entry edits (Settings GUI / cordis.yml) via the volatile field handles.
 
   registerEffects();
   boot().catch(function (e) { log('pool: boot failed: ' + e); });

@@ -29,6 +29,8 @@
       "immediately": true
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
   "license": "MIT"
 }

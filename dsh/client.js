@@ -82,7 +82,16 @@ window.__ModuleLoader__.load(
       }
 
       function CardFactory(react) {
-        return function PoolPage() {
+        return function PoolPage(props) {
+          // Slot ownerProps: { view, form? } — on the row page
+          // (plugins.row.config, key "<pkg>#<rowId>") the plugin manager passes
+          // form = { state: ConfigFormSnapshot, mutate(ops, revision) } for this
+          // plugin's own configurable entry ('subagent-pool'). When present we
+          // read initial values from form.state.value and save via form.mutate
+          // (the standard volatile-settings write path); otherwise we fall back
+          // to the /subagent-pool/configure HTTP endpoint.
+          var formRef = React.useRef(null);
+          formRef.current = (props && props.form) || null;
           var [statusVal, setStatusVal] = React.useState(null);
           var [errVal, setErrVal] = React.useState(null);
           var [formVal, setFormVal] = React.useState({ enabled: false, totalCap: 2, routes: [] });
@@ -91,6 +100,8 @@ window.__ModuleLoader__.load(
           var [catalogVal, setCatalogVal] = React.useState(null);
           var [catalogErrVal, setCatalogErrVal] = React.useState(null);
           var [infoMapVal, setInfoMapVal] = React.useState({});
+          var [openVal, setOpenVal] = React.useState({});
+          var lastCapRef = React.useRef({});
           var inflight = {};
 
           function patchForm(p) {
@@ -131,11 +142,36 @@ window.__ModuleLoader__.load(
           }
 
           function addRoute() {
+            var idx = formVal.routes.length;
             setFormVal(function (f) {
               var routes = f.routes.slice();
               routes.push({ provider: '', model: '', cap: 1, tier: '', maxThinking: '', profile: emptyProfile() });
               return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
             });
+            setOpenVal(function (o) { var n = Object.assign({}, o); n[idx] = true; return n; });
+          }
+
+          function toggleRoute(i, cap) {
+            if (cap > 0) { lastCapRef.current[i] = cap; updateRoute(i, { cap: 0 }); }
+            else { updateRoute(i, { cap: lastCapRef.current[i] || 1 }); }
+          }
+
+          function Switch(props) {
+            return React.createElement('button', {
+              type: 'button', role: 'switch', 'aria-checked': props.on ? 'true' : 'false',
+              title: props.on ? 'Route enabled — click to disable (cap 0)' : 'Route disabled — click to enable',
+              onClick: props.onClick,
+              style: {
+                width: 34, height: 18, borderRadius: 9, padding: 0, flexShrink: 0,
+                border: '1px solid ' + T.border, background: props.on ? T.ok : T.input,
+                position: 'relative', cursor: 'pointer'
+              }
+            }, React.createElement('span', {
+              style: {
+                position: 'absolute', top: 1, left: props.on ? 17 : 1,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff'
+              }
+            }));
           }
 
           function removeRoute(i) {
@@ -184,6 +220,25 @@ window.__ModuleLoader__.load(
           function configure(patch) {
             setBusyVal(true);
             setLastErrorVal(null);
+            var f = formRef.current;
+            if (f && f.state && f.state.status === 'ready' && typeof f.mutate === 'function') {
+              // Standard path: atomic volatile write to our own entry.
+              var cur = f.state.value || {};
+              var ops = [
+                { op: 'set', path: ['enabled'], value: patch.enabled === true },
+                { op: 'set', path: ['totalCap'], value: patch.totalCap },
+                { op: 'set', path: ['queueMaxWaitSec'], value: typeof cur.queueMaxWaitSec === 'number' ? cur.queueMaxWaitSec : 300 },
+                { op: 'set', path: ['queueMaxLen'], value: Number.isInteger(cur.queueMaxLen) ? cur.queueMaxLen : 20 },
+                { op: 'set', path: ['routes'], value: patch.routes }
+              ];
+              f.mutate(ops, f.state.revision)
+                .then(function (ok) {
+                  if (ok === true) { refresh(); } else { setLastErrorVal('settings rejected the write'); }
+                })
+                .catch(function (e) { setLastErrorVal(e && e.message ? e.message : String(e)); })
+                .then(function () { setBusyVal(false); });
+              return;
+            }
             configureApi(patch)
               .then(function (res) {
                 if (res && res.ok === true) {
@@ -199,6 +254,23 @@ window.__ModuleLoader__.load(
                 setBusyVal(false);
               });
           }
+
+          // Adopt the entry's current values as the form's initial state when
+          // the host supplies a form (row page); the /status poll below still
+          // fills the form when no form prop is present.
+          React.useEffect(function () {
+            var f = formRef.current;
+            if (!f || !f.state || f.state.status !== 'ready' || !f.state.value) return;
+            var v = f.state.value;
+            setFormVal(function (cur2) {
+              if (cur2.routes.length > 0) return cur2;
+              return {
+                enabled: v.enabled === true,
+                totalCap: typeof v.totalCap === 'number' ? v.totalCap : 2,
+                routes: Array.isArray(v.routes) && v.routes.length > 0 ? v.routes.map(normRoute) : cur2.routes
+              };
+            });
+          }, [props && props.form && props.form.state]);
 
           React.useEffect(function () {
             refresh();
@@ -277,7 +349,10 @@ window.__ModuleLoader__.load(
             padding: '5px 8px',
             fontSize: 13,
             color: T.text,
-            fontFamily: 'inherit'
+            fontFamily: 'inherit',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden'
           };
           var selectStyle = Object.assign({}, inputStyle, { appearance: 'none', cursor: 'pointer', paddingRight: 18 });
           var btnStyle = {
@@ -323,22 +398,23 @@ window.__ModuleLoader__.load(
             }
           }
 
+          var chipStyle = { background: T.border, borderRadius: 3, padding: '1px 6px', fontSize: 11, color: T.muted, whiteSpace: 'nowrap' };
           if (statusVal && Array.isArray(statusVal.routes) && statusVal.routes.length > 0) {
-            card.push(React.createElement('div', { key: 'routes-status', style: { marginTop: 8 } }));
+            card.push(React.createElement('div', { key: 'routes-h', style: Object.assign({}, smallMuted, { marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Routes'));
             for (var ri = 0; ri < statusVal.routes.length; ri++) {
               var sr = statusVal.routes[ri];
               var sp = (sr && sr.profile && typeof sr.profile === 'object') ? sr.profile : {};
-              card.push(React.createElement('div', { key: 'sr-' + ri, style: { display: 'flex', flexDirection: 'column', gap: 2, background: T.field, border: '1px solid ' + T.border, borderRadius: 6, padding: 8, marginTop: 4 } },
-                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                  React.createElement('span', { style: { fontWeight: 'bold', color: T.text, fontSize: 12, width: 160, flexShrink: 0 } }, (sr.provider || '') + '/' + (sr.model || '')),
-                  React.createElement('span', { style: smallMuted }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + '  running ' + (sr.running || 0) + '/' + (sr.cap || 0) + '  idle ' + (sr.idle || 0)),
-                  (sr.tier ? React.createElement('span', { key: 'tier', style: smallMuted }, '[' + sr.tier + ']') : null)
+              card.push(React.createElement('div', { key: 'sr-' + ri, style: { display: 'flex', flexDirection: 'column', gap: 6, background: T.field, border: '1px solid ' + T.border, borderRadius: 8, padding: '8px 10px', marginTop: 6 } },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                  React.createElement('span', { style: { fontWeight: 'bold', color: T.text, fontSize: 12, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' } }, (sr.provider || '') + '/' + (sr.model || '')),
+                  React.createElement('span', { key: 'stats', style: chipStyle }, 'cap ' + (sr.cap !== undefined ? sr.cap : 1) + ' · running ' + (sr.running || 0) + ' · idle ' + (sr.idle || 0)),
+                  (sr.tier ? React.createElement('span', { key: 'tier', style: chipStyle }, sr.tier) : null)
                 ),
-                React.createElement('div', { style: { display: 'flex', gap: 6, fontSize: 11, color: T.muted, flexWrap: 'wrap' } },
-                  React.createElement('span', { key: 'mt', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'max-thinking: ' + (sr.maxThinking || 'none')),
-                  React.createElement('span', { key: 'best', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'good for: ' + (sp.bestFor || '—')),
-                  React.createElement('span', { key: 'avoid', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'avoid: ' + (sp.avoidFor || '—')),
-                  React.createElement('span', { key: 'notes', style: { background: T.border, borderRadius: 3, padding: '1px 4px' } }, 'notes: ' + (sp.notes || '—'))
+                React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                  React.createElement('span', { key: 'mt', style: chipStyle }, 'max-thinking: ' + (sr.maxThinking || 'none')),
+                  React.createElement('span', { key: 'best', style: chipStyle }, 'good for: ' + (sp.bestFor || '—')),
+                  React.createElement('span', { key: 'avoid', style: chipStyle }, 'avoid: ' + (sp.avoidFor || '—')),
+                  React.createElement('span', { key: 'notes', style: chipStyle }, 'notes: ' + (sp.notes || '—'))
                 )
               ));
             }
@@ -362,7 +438,8 @@ window.__ModuleLoader__.load(
             ));
           }
 
-          card.push(React.createElement('div', { key: 'form', style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 } }));
+          card.push(React.createElement('div', { key: 'form-h', style: Object.assign({}, smallMuted, { marginTop: 16, paddingTop: 12, borderTop: '1px solid ' + T.border, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 'bold' }) }, 'Configure'));
+          card.push(React.createElement('div', { key: 'form', style: { display: 'flex', flexDirection: 'column', gap: 10 } }));
           card.push(React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13, color: T.text } },
             React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' } },
               React.createElement('input', {
@@ -384,7 +461,11 @@ window.__ModuleLoader__.load(
             )
           ));
 
-          for (var i = 0; i < formVal.routes.length; i++) {
+          // NOTE: `let`, not `var` — every row's onChange/onClick closure below
+          // captures this loop index; with `var` they all saw the final value
+          // (routes.length), so row controls wrote to a phantom out-of-range
+          // index (appending junk rows) and Remove was a no-op.
+          for (let i = 0; i < formVal.routes.length; i++) {
             var r = formVal.routes[i];
             if (r === null || r === undefined) {
               r = { provider: '', model: '', cap: 1, tier: '', maxThinking: '', profile: emptyProfile() };
@@ -403,7 +484,8 @@ window.__ModuleLoader__.load(
               var pvSel = React.createElement('select', {
                 key: 'pv',
                 value: r.provider,
-                style: Object.assign({}, selectStyle, { flex: 1, minWidth: 110 }),
+                title: r.provider || 'provider',
+                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, model: '', maxThinking: '' }); }
               }, pvOptsArr);
               line1.push(pvSel);
@@ -417,7 +499,8 @@ window.__ModuleLoader__.load(
               var mdSel = React.createElement('select', {
                 key: 'md',
                 value: r.model,
-                style: Object.assign({}, selectStyle, { flex: 1.4, minWidth: 130 }),
+                title: r.model || 'model',
+                style: Object.assign({}, selectStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }, moArr);
               line1.push(mdSel);
@@ -427,7 +510,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.provider,
                 placeholder: 'provider',
-                style: Object.assign({}, inputStyle, { flex: 1, minWidth: 110 }),
+                style: Object.assign({}, inputStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { provider: e.target.value, maxThinking: '' }); }
               }));
               line1.push(React.createElement('input', {
@@ -435,7 +518,7 @@ window.__ModuleLoader__.load(
                 type: 'text',
                 value: r.model,
                 placeholder: 'model',
-                style: Object.assign({}, inputStyle, { flex: 1.4, minWidth: 130 }),
+                style: Object.assign({}, inputStyle, { width: '100%' }),
                 onChange: function (e) { updateRoute(i, { model: e.target.value, maxThinking: '' }); }
               }));
             }
@@ -444,7 +527,7 @@ window.__ModuleLoader__.load(
               type: 'number',
               min: 0,
               value: r.cap,
-              style: Object.assign({}, inputStyle, { width: 56, flexShrink: 0 }),
+              style: Object.assign({}, inputStyle, { width: '100%' }),
               onChange: function (e) { updateRoute(i, { cap: capNum(e.target.value) }); }
             }));
             line1.push(React.createElement('button', {
@@ -452,7 +535,7 @@ window.__ModuleLoader__.load(
               style: { background: 'none', border: 'none', color: T.err, cursor: 'pointer', fontSize: 14, padding: 0, width: 24, height: 24, borderRadius: 4 },
               onClick: function () { removeRoute(i); },
               title: 'Remove route'
-            }, '\u2152'));
+            }, '\u00D7'));
 
             var mtOpts = efforts.length > 0 ? efforts.map(function (e) { return e.id; }) : EFFORT_LADDER.slice();
             if (r.maxThinking && mtOpts.indexOf(r.maxThinking) === -1) mtOpts.push(r.maxThinking);
@@ -468,7 +551,7 @@ window.__ModuleLoader__.load(
             var mtSel = React.createElement('select', {
               key: 'mt',
               value: r.maxThinking,
-              style: Object.assign({}, selectStyle, { width: 150 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateRoute(i, { maxThinking: e.target.value }); }
             }, mtArr);
             var line2 = [mtSel];
@@ -481,7 +564,7 @@ window.__ModuleLoader__.load(
             var ptSel = React.createElement('select', {
               key: 'pt',
               value: p.thinking,
-              style: Object.assign({}, selectStyle, { flex: 1, minWidth: 90 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'thinking', e.target.value); }
             }, ptArr);
             var psArr = [];
@@ -492,7 +575,7 @@ window.__ModuleLoader__.load(
             var psSel = React.createElement('select', {
               key: 'ps',
               value: p.speed,
-              style: Object.assign({}, selectStyle, { flex: 1, minWidth: 90 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'speed', e.target.value); }
             }, psArr);
             var piArr = [];
@@ -503,7 +586,7 @@ window.__ModuleLoader__.load(
             var piSel = React.createElement('select', {
               key: 'pi',
               value: p.instructions,
-              style: Object.assign({}, selectStyle, { flex: 1.3, minWidth: 110 }),
+              style: Object.assign({}, selectStyle, { width: '100%' }),
               onChange: function (e) { updateProfile(i, 'instructions', e.target.value); }
             }, piArr);
             var line3 = [ptSel, psSel, piSel];
@@ -535,39 +618,53 @@ window.__ModuleLoader__.load(
               })
             ];
 
-            card.push(React.createElement('div', { key: 'fr-' + i, style: { display: 'flex', flexDirection: 'column', gap: 6, border: '1px dashed ' + T.border, borderRadius: 8, padding: 10, background: T.field } },
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'route'),
-                line1[0], line1[1], line1[2], line1[3]
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'max thinking'),
-                line2[0]
-              ),
-              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                React.createElement('span', { style: Object.assign({}, smallMuted, { width: 84, flexShrink: 0 }) }, 'profile'),
-                line3[0], line3[1], line3[2]
-              ),
-              line4[0], line4[1], line4[2]
-            ));
+            var isOpen = openVal[i] === true;
+            var capOn = Number(r.cap) > 0;
+            var sw = React.createElement(Switch, { on: capOn, onClick: function () { toggleRoute(i, Number(r.cap) || 0); } });
+            var chev = React.createElement('button', {
+              type: 'button', title: isOpen ? 'Collapse details' : 'Expand details',
+              'aria-label': isOpen ? 'Collapse route details' : 'Expand route details',
+              onClick: function () { setOpenVal(function (o) { var n = Object.assign({}, o); n[i] = !isOpen; return n; }); },
+              style: { background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 14, width: 28, height: 24, padding: 0 }
+            }, isOpen ? '\u25BE' : '\u25B8');
+            var capBox = React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+              React.createElement('span', { style: smallMuted }, 'cap'),
+              line1[2]
+            );
+            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '34px minmax(0,0.85fr) minmax(0,1.6fr) 92px 28px 28px', gap: 8, alignItems: 'center' } },
+              sw, line1[0], line1[1], capBox, chev, line1[3]
+            )];
+            if (isOpen) {
+              panel.push(React.createElement('div', { key: 'det', style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid ' + T.border, display: 'flex', flexDirection: 'column', gap: 8 } },
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '110px 190px', gap: 8, alignItems: 'center' } },
+                  React.createElement('span', { style: smallMuted }, 'max thinking'),
+                  line2[0]
+                ),
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
+                  line3[0], line3[1], line3[2]
+                ),
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
+                  line4[0], line4[1], line4[2]
+                )
+              ));
+            }
+            card.push(React.createElement('div', { key: 'fr-' + i, style: { border: '1px solid ' + T.border, borderRadius: 8, padding: 10, background: T.field, marginTop: 8 } }, panel));
           }
 
-          card.push(React.createElement('button', {
-            key: 'add-route',
-            style: Object.assign({}, btnStyle, { alignSelf: 'flex-start' }),
-            onClick: function () { addRoute(); }
-          }, '+ Add route'));
-
-          card.push(React.createElement('button', {
-            key: 'save',
-            style: Object.assign({}, btnStyle, { alignSelf: 'flex-start' }),
-            disabled: busyVal,
-            onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
-          }, 'Save'));
-
-          if (lastErrorVal) {
-            card.push(React.createElement('div', { key: 'last-err', style: { fontSize: 12, color: T.err } }, lastErrorVal));
-          }
+          card.push(React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' } },
+            React.createElement('button', {
+              key: 'add-route',
+              style: btnStyle,
+              onClick: function () { addRoute(); }
+            }, '+ Add route'),
+            React.createElement('button', {
+              key: 'save',
+              style: btnStyle,
+              disabled: busyVal,
+              onClick: function () { configure({ enabled: formVal.enabled, totalCap: formVal.totalCap, routes: formVal.routes }); }
+            }, busyVal ? 'Saving…' : 'Save'),
+            lastErrorVal ? React.createElement('span', { key: 'last-err', style: { fontSize: 12, color: T.err } }, lastErrorVal) : null
+          ));
 
           return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 720, padding: 16, fontSize: 13, color: T.text, fontFamily: 'inherit' } }, card);
         };
@@ -594,18 +691,36 @@ window.__ModuleLoader__.load(
               console.error('[subagent-pool] React not available, card skipped');
               return;
             }
-            scope.slots.inject("settings.plugin.item", function* () {
+            // Render the card on this bundle's detail page in the Plugins
+            // screen: v0.2.2-rc.1 renders `plugins.bundle.config` keyed by the
+            // bundle package name with view 'page' (plugin-manager client.js).
+            // The previous targets (settings.plugin.item,
+            // settings.agentPresets.configurable) are not declared slots in
+            // this version, so the card never rendered anywhere.
+            scope.slots.inject("plugins.bundle.config", function* () {
               yield scope.slots.register(
-                { name: 'settings.plugin.item', id: NAME, key: 'subagent-model-selection', order: 10 },
-                Card
+                { name: 'plugins.bundle.config', id: NAME, key: 'dsh-subagent-pool', order: 10 },
+                function (props) { return Card(props); }
               );
             });
-            // Also register in agent-presets section's configurable slot
-            // so the card appears under Agent presets tab, not just Plugins tab.
-            scope.slots.inject("settings.agentPresets.configurable", function* () {
+            // Standard third-party config page: the row page inside the bundle
+            // (Plugins -> dsh-subagent-pool -> subagent-pool row) renders
+            // plugins.row.config keyed "<pkg>#<rowId>" and passes
+            // form = { state, mutate } for this entry's Config schema — the
+            // cookbook path (form.state / form.mutate, volatile hot-apply).
+            scope.slots.inject("plugins.row.config", function* () {
               yield scope.slots.register(
-                { name: 'settings.agentPresets.configurable', id: NAME, key: 'subagent-model-selection', order: 10 },
-                Card
+                { name: 'plugins.row.config', id: NAME, key: 'dsh-subagent-pool#subagent-pool', order: 10 },
+                function (props) { return Card(props); }
+              );
+            });
+            // Also give the pool a page inside Settings -> Built-in plugins
+            // (documented slot contract: settings.plugins.tab, list, options
+            // id/order/label; the section owner renders label as the tab).
+            scope.slots.inject("settings.plugins.tab", function* () {
+              yield scope.slots.register(
+                { name: 'settings.plugins.tab', id: 'subagent-pool', order: 60, label: 'Subagent Pool' },
+                function (props) { return Card(props); }
               );
             });
           } catch (err) {
