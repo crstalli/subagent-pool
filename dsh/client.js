@@ -100,6 +100,8 @@ window.__ModuleLoader__.load(
           var [catalogVal, setCatalogVal] = React.useState(null);
           var [catalogErrVal, setCatalogErrVal] = React.useState(null);
           var [infoMapVal, setInfoMapVal] = React.useState({});
+          var [openVal, setOpenVal] = React.useState({});
+          var lastCapRef = React.useRef({});
           var inflight = {};
 
           function patchForm(p) {
@@ -140,11 +142,36 @@ window.__ModuleLoader__.load(
           }
 
           function addRoute() {
+            var idx = formVal.routes.length;
             setFormVal(function (f) {
               var routes = f.routes.slice();
               routes.push({ provider: '', model: '', cap: 1, tier: '', maxThinking: '', profile: emptyProfile() });
               return { enabled: f.enabled, totalCap: f.totalCap, routes: routes };
             });
+            setOpenVal(function (o) { var n = Object.assign({}, o); n[idx] = true; return n; });
+          }
+
+          function toggleRoute(i, cap) {
+            if (cap > 0) { lastCapRef.current[i] = cap; updateRoute(i, { cap: 0 }); }
+            else { updateRoute(i, { cap: lastCapRef.current[i] || 1 }); }
+          }
+
+          function Switch(props) {
+            return React.createElement('button', {
+              type: 'button', role: 'switch', 'aria-checked': props.on ? 'true' : 'false',
+              title: props.on ? 'Route enabled — click to disable (cap 0)' : 'Route disabled — click to enable',
+              onClick: props.onClick,
+              style: {
+                width: 34, height: 18, borderRadius: 9, padding: 0, flexShrink: 0,
+                border: '1px solid ' + T.border, background: props.on ? T.ok : T.input,
+                position: 'relative', cursor: 'pointer'
+              }
+            }, React.createElement('span', {
+              style: {
+                position: 'absolute', top: 1, left: props.on ? 17 : 1,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff'
+              }
+            }));
           }
 
           function removeRoute(i) {
@@ -586,21 +613,37 @@ window.__ModuleLoader__.load(
               })
             ];
 
-            card.push(React.createElement('div', { key: 'fr-' + i, style: { display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid ' + T.border, borderRadius: 8, padding: 10, background: T.field, marginTop: 8 } },
-              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr) 60px 26px', gap: 8, alignItems: 'center' } },
-                line1[0], line1[1], line1[2], line1[3]
-              ),
-              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '110px 190px', gap: 8, alignItems: 'center' } },
-                React.createElement('span', { style: smallMuted }, 'max thinking'),
-                line2[0]
-              ),
-              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
-                line3[0], line3[1], line3[2]
-              ),
-              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
-                line4[0], line4[1], line4[2]
-              )
-            ));
+            var isOpen = openVal[i] === true;
+            var capOn = Number(r.cap) > 0;
+            var sw = React.createElement(Switch, { on: capOn, onClick: function () { toggleRoute(i, Number(r.cap) || 0); } });
+            var chev = React.createElement('button', {
+              type: 'button', title: isOpen ? 'Collapse details' : 'Expand details',
+              'aria-label': isOpen ? 'Collapse route details' : 'Expand route details',
+              onClick: function () { setOpenVal(function (o) { var n = Object.assign({}, o); n[i] = !isOpen; return n; }); },
+              style: { background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 14, width: 28, height: 24, padding: 0 }
+            }, isOpen ? '\u25BE' : '\u25B8');
+            var capBox = React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+              React.createElement('span', { style: smallMuted }, 'cap'),
+              line1[2]
+            );
+            var panel = [React.createElement('div', { key: 'hdr', style: { display: 'grid', gridTemplateColumns: '34px minmax(0,1fr) minmax(0,1.3fr) 92px 28px 28px', gap: 8, alignItems: 'center' } },
+              sw, line1[0], line1[1], capBox, chev, line1[3]
+            )];
+            if (isOpen) {
+              panel.push(React.createElement('div', { key: 'det', style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid ' + T.border, display: 'flex', flexDirection: 'column', gap: 8 } },
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '110px 190px', gap: 8, alignItems: 'center' } },
+                  React.createElement('span', { style: smallMuted }, 'max thinking'),
+                  line2[0]
+                ),
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
+                  line3[0], line3[1], line3[2]
+                ),
+                React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 } },
+                  line4[0], line4[1], line4[2]
+                )
+              ));
+            }
+            card.push(React.createElement('div', { key: 'fr-' + i, style: { border: '1px solid ' + T.border, borderRadius: 8, padding: 10, background: T.field, marginTop: 8 } }, panel));
           }
 
           card.push(React.createElement('div', { key: 'actions', style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' } },
