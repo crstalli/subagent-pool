@@ -6,7 +6,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const b = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const p = await b.newPage({ viewport: { width: 1500, height: 1150 } });
   p.on('pageerror', (e) => console.log('PAGE-ERR:', String(e).slice(0, 160)));
-  const log = fs.readFileSync('/tmp/final10.log', 'utf8');
+  const log = fs.readFileSync(process.argv[2] || '/tmp/final10.log', 'utf8');
   const tm = log.match(/http:\/\/127\.0\.0\.1:3088\/\?token=\S+/);
   await p.goto(tm[0], { waitUntil: 'domcontentloaded' }); await sleep(2000);
   await p.goto('http://127.0.0.1:3088/', { waitUntil: 'domcontentloaded' }); await sleep(6000);
