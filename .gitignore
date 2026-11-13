@@ -6,3 +6,5 @@ test/console-errors.txt
 *.log
 .dsh-module-fallback/
 config/
+test-results/
+tests/

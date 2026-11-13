@@ -6,33 +6,33 @@
   "queueMaxLen": 20,
   "routes": [
     {
-      "provider": "arc",
-      "model": "qwen3.8-27b-k4_xl-thinking",
-      "cap": 0,
+      "provider": "nvidia",
+      "model": "nvidia/nemotron-3-ultra-550b-a55b",
+      "cap": 1,
       "tier": "deep",
       "maxThinking": "high",
       "profile": {
         "thinking": "high",
         "speed": "medium",
         "instructions": "high-level ok",
-        "bestFor": "deep reasoning",
+        "bestFor": "deep reasoning, complex tasks",
         "avoidFor": "trivial tasks",
-        "notes": "disabled for test"
+        "notes": "NVIDIA Nemotron 3 Ultra 550B"
       }
     },
     {
-      "provider": "bonzai-rtx",
-      "model": "rtx-bonzi",
+      "provider": "nvidia",
+      "model": "deepseek-ai/deepseek-v4.1-flash",
       "cap": 1,
-      "tier": "deep",
+      "tier": "fast",
       "maxThinking": "medium",
       "profile": {
         "thinking": "medium",
         "speed": "fast",
         "instructions": "high-level ok",
-        "bestFor": "quick tasks",
+        "bestFor": "quick tasks, coding",
         "avoidFor": "deep reasoning",
-        "notes": ""
+        "notes": "DeepSeek V4.1 Flash"
       }
     }
   ]
