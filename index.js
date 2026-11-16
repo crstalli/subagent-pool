@@ -74,6 +74,7 @@ export function apply(ctx, config) {
   let enabled = false;
   let reason = 'starting';
   const tracked = new Map();
+  let sessions = null;
 
   // Live Config-entry handle (exported `Config` above). Volatile fields arrive
   // as Volatile handles with .get(); plain values are used as-is. `cs()` is the
@@ -768,6 +769,43 @@ export function apply(ctx, config) {
       }
     });
 
+    // POST /subagent-pool/sync-model-selection — update a session's model selection policy
+    // with the current pool routes (allows adding models to existing sessions without restart)
+    webServer.register({
+      name: 'pool-sync-model-selection',
+      kind: 'exact',
+      path: '/subagent-pool/sync-model-selection',
+      handler: async function (req, res) {
+        if (req.method !== 'POST') { send(res, 200, { ok: false, error: 'POST required' }); return; }
+        var body = '';
+        req.on('data', function (chunk) { body += chunk; });
+        req.on('end', async function () {
+          try {
+            var data = JSON.parse(body || '{}');
+            var sessionId = data.sessionId;
+            if (!sessionId) { send(res, 200, { ok: false, error: 'sessionId required' }); return; }
+            var cfg = cs();
+            if (!cfg) { send(res, 200, { ok: false, error: 'pool not configured' }); return; }
+            // Build allowedModels from pool routes
+            var allowedModels = cfg.routes
+              .filter(function (r) { return r.cap > 0; })
+              .map(function (r) { return { provider: r.provider, model: r.model }; });
+            if (allowedModels.length === 0) { send(res, 200, { ok: false, error: 'no active routes' }); return; }
+            // Get sessions service to append the policy event
+            var sessions = ctx.get('sessions');
+            if (!sessions) { send(res, 200, { ok: false, error: 'sessions service unavailable' }); return; }
+            var session = sessions.get(sessionId);
+            if (!session) { send(res, 200, { ok: false, error: 'session not found' }); return; }
+            // Append the model-selection-policy event to update the durable policy
+            await session.append('subagent/model-selection-policy', { allowedModels });
+            send(res, 200, { ok: true, message: 'Model selection synced', allowedModels });
+          } catch (e) {
+            send(res, 200, { ok: false, error: 'sync failed: ' + (e && e.message ? e.message : String(e)) });
+          }
+        });
+      }
+    });
+
     // GET /subagent-pool/configure?config=BASE64
     webServer.register({
       name: 'pool-configure',
@@ -826,6 +864,10 @@ export function apply(ctx, config) {
 
   ctx.inject(['agents'], (scope) => {
     agents = scope.agents;
+  });
+
+  ctx.inject(['sessions'], (scope) => {
+    sessions = scope.sessions;
   });
 
   ctx.inject(['systemPrompt'], (scope) => {
