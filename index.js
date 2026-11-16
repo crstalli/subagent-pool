@@ -829,6 +829,39 @@ export function apply(ctx, config) {
       }
     });
 
+    // GET /subagent-pool/policy?sessionId=... — read the current projection cell state for a session (debug/test)
+    webServer.register({
+      name: 'pool-policy-debug',
+      kind: 'exact',
+      path: '/subagent-pool/policy',
+      handler: async function (req, res) {
+        var url = new URL(req.url, 'http://localhost');
+        var sessionId = url.searchParams.get('sessionId') || '';
+        if (!sessionId) { send(res, 200, { ok: false, error: 'sessionId required' }); return; }
+        var s = sessions && sessions.get(sessionId);
+        if (!s) { send(res, 200, { ok: false, error: 'session not found' }); return; }
+        var cellState = null;
+        try {
+          if (sessionProjections && sessionProjections.registrations) {
+            var reg = sessionProjections.registrations.get('subagentModelSelectionPolicy');
+            if (reg && reg.cells) {
+              var cell = reg.cells.get(s);
+              cellState = cell ? cell.state : null;
+            }
+          }
+        } catch (e) { cellState = 'error: ' + e.message; }
+        // Also read via the official handle if available
+        var handleState = null;
+        try {
+          if (sessionProjections && sessionProjections.stateOf) {
+            handleState = sessionProjections.stateOf(s, 'subagentModelSelectionPolicy');
+          }
+        } catch (e) {}
+        send(res, 200, { ok: true, sessionId: sessionId, cellState: cellState, handleState: handleState });
+      }
+    });
+
+
     // POST /subagent-pool/sync-model-selection — update a session's model selection policy
     // with the current pool routes (allows adding models to existing sessions without restart)
     webServer.register({
