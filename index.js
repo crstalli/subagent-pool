@@ -127,6 +127,43 @@ export function apply(ctx, config) {
     return configState;
   }
 
+  // Sync the subagent/model-selection-policy event to every live, agent-available,
+  // non-archived session so pool config changes propagate without a restart.
+  // Sessions that have not yet received a policy event will pick it up; sessions
+  // that already have one keep their existing durable policy (first-write-wins
+  // projection) — those still need the explicit sync endpoint or a new session.
+  async function syncAllSessions(allowedModels) {
+    if (!Array.isArray(allowedModels) || allowedModels.length === 0) return { synced: 0, skipped: 0, errors: 0 };
+    if (!sessions) { log('pool: sync-all skipped — sessions service unavailable'); return { synced: 0, skipped: 0, errors: 0 }; }
+    var archivedIds = [];
+    try {
+      if (workspaceRegistry && workspaceRegistry.archivedSessionIds) archivedIds = workspaceRegistry.archivedSessionIds;
+    } catch (e) {}
+    var list;
+    try { list = sessions.list(); } catch (e) { log('pool: sync-all failed to list sessions: ' + e); return { synced: 0, skipped: 0, errors: 1 }; }
+    if (!Array.isArray(list)) return { synced: 0, skipped: 0, errors: 0 };
+    var synced = 0, skipped = 0, errors = 0;
+    for (var i = 0; i < list.length; i++) {
+      var session = list[i];
+      if (!session || !session.id) { skipped++; continue; }
+      // Only sync sessions that have a live agent attached (agentAvailable === true)
+      // and are not archived.
+      var agentAvailable = false;
+      try { agentAvailable = !!(agents && agents.get(session.id) && agents.get(session.id).session === session); } catch (e) {}
+      if (!agentAvailable) { skipped++; continue; }
+      if (archivedIds.indexOf(session.id) !== -1) { skipped++; continue; }
+      try {
+        await session.append('subagent/model-selection-policy', { allowedModels: allowedModels });
+        synced++;
+      } catch (e) {
+        errors++;
+        log('pool: sync-all append failed for ' + session.id + ': ' + (e && e.message ? e.message : String(e)));
+      }
+    }
+    log('pool: sync-all complete — synced=' + synced + ' skipped=' + skipped + ' errors=' + errors);
+    return { synced: synced, skipped: skipped, errors: errors };
+  }
+
   // Effective global concurrency cap: in auto mode it is the sum of all
   // enabled route caps (min 1 so the pool stays valid when every route is
   // toggled off); otherwise the stored totalCap.
@@ -168,6 +205,7 @@ export function apply(ctx, config) {
   let llm = null;
   let timer = null;
   let webServer = null;
+  let workspaceRegistry = null;
 
   // ---- default route (leaf reads only) ----
   function defaultRoute() {
@@ -847,7 +885,22 @@ export function apply(ctx, config) {
           }
           adopt(next, { namespace: true });
           if (!enabled) flushQueue('disabled while request was waiting in the queue.');
-          send(res, 200, { ok: true, status: statusPayload() });
+          // Propagate the new allowedModels to all live, agent-available, non-archived
+          // sessions so pool changes take effect immediately without a restart.
+          var syncAllowedModels = (next.routes || [])
+            .filter(function (r) { return r && r.cap > 0 && r.provider && r.model; })
+            .map(function (r) { return { provider: r.provider, model: r.model }; });
+          var syncResult = { synced: 0, skipped: 0, errors: 0 };
+          if (syncAllowedModels.length > 0) {
+            try {
+              syncResult = await syncAllSessions(syncAllowedModels);
+            } catch (e) {
+              log('pool: sync-all failed: ' + (e && e.message ? e.message : String(e)));
+            }
+          }
+          var payload = statusPayload();
+          payload.sync = syncResult;
+          send(res, 200, { ok: true, status: payload });
         } catch (e) {
           send(res, 200, { ok: false, error: 'write failed: ' + (e && e.message ? e.message : String(e)) });
         }
@@ -868,6 +921,10 @@ export function apply(ctx, config) {
 
   ctx.inject(['sessions'], (scope) => {
     sessions = scope.sessions;
+  });
+
+  ctx.inject(['workspaceRegistry'], (scope) => {
+    workspaceRegistry = scope.workspaceRegistry;
   });
 
   ctx.inject(['systemPrompt'], (scope) => {
