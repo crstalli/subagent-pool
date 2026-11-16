@@ -127,11 +127,28 @@ export function apply(ctx, config) {
     return configState;
   }
 
-  // Sync the subagent/model-selection-policy event to every live, agent-available,
+  // Sync the subagent/model-selection-policy to every live, agent-available,
   // non-archived session so pool config changes propagate without a restart.
-  // Sessions that have not yet received a policy event will pick it up; sessions
-  // that already have one keep their existing durable policy (first-write-wins
-  // projection) — those still need the explicit sync endpoint or a new session.
+  //
+  // The DSH core projection (subagentModelSelectionPolicy) is first-write-wins:
+  // apply() ignores events once policy !== null. To update EXISTING sessions we
+  // bypass the event log and directly overwrite the projection cell's state in
+  // the sessionProjections service's internal WeakMap. New sessions still get
+  // the policy via the normal agent/created → append path.
+  function overwriteProjectionCell(session, allowedModels) {
+    if (!sessionProjections) return false;
+    try {
+      const reg = sessionProjections.registrations && sessionProjections.registrations.get('subagentModelSelectionPolicy');
+      if (!reg || !reg.cells) return false;
+      const cell = reg.cells.get(session);
+      if (!cell) return false;
+      cell.state = allowedModels.map((r) => ({ provider: r.provider, model: r.model }));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async function syncAllSessions(allowedModels) {
     if (!Array.isArray(allowedModels) || allowedModels.length === 0) return { synced: 0, skipped: 0, errors: 0 };
     if (!sessions) { log('pool: sync-all skipped — sessions service unavailable'); return { synced: 0, skipped: 0, errors: 0 }; }
@@ -153,7 +170,11 @@ export function apply(ctx, config) {
       if (!agentAvailable) { skipped++; continue; }
       if (archivedIds.indexOf(session.id) !== -1) { skipped++; continue; }
       try {
+        // 1. Append the event (works for sessions with null policy — new sessions).
         await session.append('subagent/model-selection-policy', { allowedModels: allowedModels });
+        // 2. Directly overwrite the projection cell (works for sessions that already
+        //    have a policy — bypasses the first-write-wins apply()).
+        overwriteProjectionCell(session, allowedModels);
         synced++;
       } catch (e) {
         errors++;
@@ -206,6 +227,7 @@ export function apply(ctx, config) {
   let timer = null;
   let webServer = null;
   let workspaceRegistry = null;
+  let sessionProjections = null;
 
   // ---- default route (leaf reads only) ----
   function defaultRoute() {
@@ -834,9 +856,12 @@ export function apply(ctx, config) {
             if (!sessions) { send(res, 200, { ok: false, error: 'sessions service unavailable' }); return; }
             var session = sessions.get(sessionId);
             if (!session) { send(res, 200, { ok: false, error: 'session not found' }); return; }
-            // Append the model-selection-policy event to update the durable policy
+            // Append the model-selection-policy event (for new/null-policy sessions)
+            // AND directly overwrite the projection cell (for existing sessions,
+            // bypassing the first-write-wins apply()).
             await session.append('subagent/model-selection-policy', { allowedModels });
-            send(res, 200, { ok: true, message: 'Model selection synced', allowedModels });
+            var overwritten = overwriteProjectionCell(session, allowedModels);
+            send(res, 200, { ok: true, message: 'Model selection synced', allowedModels, cellOverwritten: overwritten });
           } catch (e) {
             send(res, 200, { ok: false, error: 'sync failed: ' + (e && e.message ? e.message : String(e)) });
           }
@@ -925,6 +950,10 @@ export function apply(ctx, config) {
 
   ctx.inject(['workspaceRegistry'], (scope) => {
     workspaceRegistry = scope.workspaceRegistry;
+  });
+
+  ctx.inject(['sessionProjections'], (scope) => {
+    sessionProjections = scope.sessionProjections;
   });
 
   ctx.inject(['systemPrompt'], (scope) => {
